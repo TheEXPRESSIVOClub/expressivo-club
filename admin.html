@@ -107,7 +107,6 @@
             }
         }
 
-        // Delete student function
         window.deleteStudent = async function(studentId, studentName, familyId) {
             if (!confirm(`Are you sure you want to remove student "${studentName}"?`)) return;
             try {
@@ -309,7 +308,8 @@
             } else {
                 studentsContainer.innerHTML = uniqueFamilies.map(famKey => {
                     const famStudents = data.students.filter(s => s.family === famKey);
-                    const famWallet = data.families[famKey] || { wallet: 0, stars: 0, tier: 'Prelude' };
+                    const famWallet = data.families[famKey] || { wallet: 0, stars: 100, tier: 'Prelude' };
+                    // Pass the first student's name explicitly in query parameters
                     const parentLink = `portal.html?student=${encodeURIComponent(famStudents[0]?.name || '')}`;
 
                     return `
@@ -317,7 +317,7 @@
                             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-2">
                                 <div>
                                     <h3 class="font-bold text-slate-800">Family Group: <span class="text-indigo-600">${famKey}</span></h3>
-                                    <p class="text-slate-500">Tier: <span class="font-semibold text-slate-700">${famWallet.tier}</span> | Wallet: <span class="font-bold text-emerald-600">RM ${Number(famWallet.wallet).toFixed(2)}</span> | Stars: <span class="font-bold text-amber-600">${famWallet.stars || 0} ⭐</span></p>
+                                    <p class="text-slate-500">Tier: <span class="font-semibold text-slate-700">${famWallet.tier}</span> | Wallet: <span class="font-bold text-emerald-600">RM ${Number(famWallet.wallet).toFixed(2)}</span> | Stars: <span class="font-bold text-amber-600">${famWallet.stars || 100} ⭐</span></p>
                                 </div>
                                 <div class="flex gap-2">
                                     <button onclick="adjustWallet('${famKey}')" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition">Adjust Wallet</button>
