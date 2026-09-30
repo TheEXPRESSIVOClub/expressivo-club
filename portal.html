@@ -25,7 +25,6 @@
         window.portalData = { student: null, family: null, siblings: [], workshops: [], transactions: [] };
 
         function initPortal() {
-            // Render static components immediately so catalog is always visible
             renderRewardsCatalog();
 
             const urlParams = new URLSearchParams(window.location.search);
@@ -35,7 +34,10 @@
                 const students = [];
                 snapshot.forEach(d => students.push({ id: d.id, ...d.data() }));
                 
-                if (students.length === 0) return;
+                if (students.length === 0) {
+                    document.getElementById('header-student-subtitle').innerText = "No student found in system.";
+                    return;
+                }
 
                 let found = null;
                 if (studentParam) {
@@ -185,7 +187,7 @@
                         <div class="bg-slate-50 p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
                             <div>
                                 <h4 class="font-bold text-slate-800 text-sm">${w.title} ${w.exclusive ? '<span class="text-amber-600 font-semibold">⭐ Exclusive</span>' : ''}</h4>
-                                <p class="text-slate-500 mt-0.5">📅 Date: ${w.date} | ⏰ Time: ${w.time || 'TBD'} | 👨‍‍🏫 Teacher: ${w.teacher || 'TBD'}</p>
+                                <p class="text-slate-500 mt-0.5">📅 Date: ${w.date} | ⏰ Time: ${w.time || 'TBD'} | 👨‍🏫 Teacher: ${w.teacher || 'TBD'}</p>
                                 <p class="text-slate-600 font-semibold mt-0.5">Price: RM ${w.price}</p>
                             </div>
                             <div>
