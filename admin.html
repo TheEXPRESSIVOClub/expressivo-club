@@ -86,7 +86,7 @@
                 const famRef = doc(db, "families", familyId);
                 await setDoc(famRef, {
                     wallet: wallet,
-                    stars: 100, // Automatic 100 stars upon signup
+                    stars: 100, // Automatic 100 stars welcome bonus
                     tier: tier
                 }, { merge: true });
 
@@ -122,6 +122,29 @@
                 alert(`Student "${studentName}" removed.`);
             } catch (err) {
                 console.error("Error deleting student:", err);
+            }
+        }
+
+        window.addReferralStars = async function(familyKey) {
+            try {
+                const fam = window.appData.families[familyKey] || { stars: 100 };
+                const currentStars = Number(fam.stars || 100);
+                const newStars = currentStars + 20;
+
+                await setDoc(doc(db, "families", familyKey), { stars: newStars }, { merge: true });
+                await addDoc(collection(db, "transactions"), {
+                    date: new Date().toISOString().split('T')[0],
+                    student: 'Family Referral',
+                    family: familyKey,
+                    desc: 'Friend Referral Bonus Awarded',
+                    amount: 'RM 0.00',
+                    starsChange: '+20 ⭐'
+                });
+
+                alert(`Successfully added 20 referral stars to family "${familyKey}"!`);
+            } catch (err) {
+                console.error("Error adding referral stars:", err);
+                alert("Error updating referral stars.");
             }
         }
 
@@ -309,7 +332,6 @@
                 studentsContainer.innerHTML = uniqueFamilies.map(famKey => {
                     const famStudents = data.students.filter(s => s.family === famKey);
                     const famWallet = data.families[famKey] || { wallet: 0, stars: 100, tier: 'Prelude' };
-                    // Pass the first student's name explicitly in query parameters
                     const parentLink = `portal.html?student=${encodeURIComponent(famStudents[0]?.name || '')}`;
 
                     return `
@@ -319,7 +341,8 @@
                                     <h3 class="font-bold text-slate-800">Family Group: <span class="text-indigo-600">${famKey}</span></h3>
                                     <p class="text-slate-500">Tier: <span class="font-semibold text-slate-700">${famWallet.tier}</span> | Wallet: <span class="font-bold text-emerald-600">RM ${Number(famWallet.wallet).toFixed(2)}</span> | Stars: <span class="font-bold text-amber-600">${famWallet.stars || 100} ⭐</span></p>
                                 </div>
-                                <div class="flex gap-2">
+                                <div class="flex flex-wrap gap-2">
+                                    <button onclick="addReferralStars('${famKey}')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg transition">+20 Ref ⭐</button>
                                     <button onclick="adjustWallet('${famKey}')" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition">Adjust Wallet</button>
                                     <a href="${parentLink}" target="_blank" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition inline-block">Open Portal ↗</a>
                                 </div>
