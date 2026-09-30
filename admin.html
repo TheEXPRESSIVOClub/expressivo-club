@@ -25,9 +25,6 @@
         window.db = db;
         window.appData = { students: [], families: {}, workshops: [], vouchers: [], transactions: [] };
 
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
-        getAnalytics(app);
-
         function initFirestoreListeners() {
             onSnapshot(collection(db, "families"), (snapshot) => {
                 window.appData.families = {};
@@ -152,17 +149,20 @@
             e.preventDefault();
             const title = document.getElementById('ws-title').value.trim();
             const date = document.getElementById('ws-date').value.trim();
+            const time = document.getElementById('ws-time').value.trim();
+            const teacher = document.getElementById('ws-teacher').value.trim();
             const price = parseFloat(document.getElementById('ws-price').value) || 0;
             const exclusive = document.getElementById('ws-exclusive').checked;
 
             try {
                 await addDoc(collection(db, "workshops"), {
-                    title, date, price, exclusive, registered: []
+                    title, date, time, teacher, price, exclusive, registered: []
                 });
-                alert(`Workshop "${title}" published!`);
+                alert(`Workshop "${title}" published successfully!`);
                 e.target.reset();
             } catch (err) {
                 console.error("Error creating workshop: ", err);
+                alert("Error publishing workshop.");
             }
         }
 
@@ -240,10 +240,10 @@
                         <div>
                             <label class="block font-bold text-slate-600 mb-1">Membership Tier</label>
                             <select id="new-family-tier" class="w-full p-2.5 border rounded-xl bg-white outline-none">
-                                <option value="Prelude">Prelude (Basic)</option>
-                                <option value="Ensemble">Ensemble (Silver)</option>
-                                <option value="Crescendo">Crescendo (Gold)</option>
-                                <option value="Virtuoso">Virtuoso (Platinum)</option>
+                                <option value="Prelude">Prelude </option>
+                                <option value="Ensemble">Ensemble </option>
+                                <option value="Crescendo">Crescendo </option>
+                                <option value="Virtuoso">Virtuoso </option>
                             </select>
                         </div>
                         <div>
@@ -269,11 +269,19 @@
                     <form onsubmit="handleCreateWorkshop(event)" class="space-y-3 text-xs">
                         <div>
                             <label class="block font-bold text-slate-600 mb-1">Workshop Title</label>
-                            <input type="text" id="ws-title" required placeholder="e.g. Jazz Piano" class="w-full p-2.5 border rounded-xl outline-none">
+                            <input type="text" id="ws-title" required placeholder="e.g. Jazz Piano Masterclass" class="w-full p-2.5 border rounded-xl outline-none">
                         </div>
                         <div>
                             <label class="block font-bold text-slate-600 mb-1">Date</label>
                             <input type="text" id="ws-date" required placeholder="e.g. Nov 10, 2026" class="w-full p-2.5 border rounded-xl outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-600 mb-1">Time</label>
+                            <input type="text" id="ws-time" required placeholder="e.g. 2:00 PM - 4:00 PM" class="w-full p-2.5 border rounded-xl outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-600 mb-1">Teacher / Instructor</label>
+                            <input type="text" id="ws-teacher" required placeholder="e.g. Teacher Sarah" class="w-full p-2.5 border rounded-xl outline-none">
                         </div>
                         <div>
                             <label class="block font-bold text-slate-600 mb-1">Price (RM)</label>
@@ -369,7 +377,7 @@
                     <div class="bg-slate-50 p-4 rounded-xl border flex justify-between items-center">
                         <div>
                             <h4 class="font-bold text-slate-800">${w.title} ${w.exclusive ? '<span class="text-amber-600">⭐ Exclusive</span>' : ''}</h4>
-                            <p class="text-slate-500">Date: ${w.date} | Price: RM ${w.price}</p>
+                            <p class="text-slate-500">Date: ${w.date} | Time: ${w.time || 'TBD'} | Teacher: ${w.teacher || 'TBD'} | Price: RM ${w.price}</p>
                             <p class="text-slate-600 mt-1">Registered: <span class="font-semibold">${(w.registered || []).join(', ') || 'None yet'}</span></p>
                         </div>
                     </div>
