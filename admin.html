@@ -56,6 +56,10 @@
                     <span class="text-slate-500">Voucher Discount:</span>
                     <span class="font-bold text-emerald-600" id="pos-discount-price">- RM 0.00</span>
                 </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-slate-500">Stars Earned for Purchase (50% value):</span>
+                    <span class="font-bold text-amber-600" id="pos-earned-stars">+0 ⭐</span>
+                </div>
                 <hr class="my-2">
                 <div class="flex justify-between text-lg font-extrabold">
                     <span class="text-slate-800">Final Total Amount:</span>
@@ -240,7 +244,7 @@
                         { id: 102, title: "Advanced Violin Masterclass", price: 150, exclusive: true, date: "Oct 22, 2026", registered: ['Emma Tan'] }
                     ],
                     transactions: [
-                        { date: '2026-09-28', student: 'Alex Tan', family: 'family_1', desc: 'Registered for Piano Technique Workshop', amount: '- RM 88.00', starsChange: '+20 ⭐' }
+                        { date: '2026-09-28', student: 'Alex Tan', family: 'family_1', desc: 'Registered for Piano Technique Workshop', amount: '- RM 88.00', starsChange: '+44 ⭐' }
                     ]
                 };
             }
@@ -309,9 +313,13 @@
 
             if (discount > originalPrice) discount = originalPrice;
             let finalPrice = originalPrice - discount;
+            
+            // Auto-calculate earned stars (e.g. RM 88 -> 44 stars based on 2 RM = 1 star)
+            let earnedStars = Math.round(finalPrice * 0.5);
 
             document.getElementById('pos-original-price').innerText = `RM ${originalPrice.toFixed(2)}`;
             document.getElementById('pos-discount-price').innerText = `- RM ${discount.toFixed(2)}`;
+            document.getElementById('pos-earned-stars').innerText = `+${earnedStars} ⭐`;
             document.getElementById('pos-final-price').innerText = `RM ${finalPrice.toFixed(2)}`;
         }
 
@@ -319,20 +327,50 @@
             const data = getData();
             const studentName = document.getElementById('pos-student').value;
             const itemId = document.getElementById('pos-item').value;
+            const voucherId = document.getElementById('pos-voucher').value;
             const workshop = data.workshops.find(w => w.id == itemId);
             const student = data.students.find(s => s.name === studentName);
 
             if (student && workshop) {
+                let originalPrice = workshop.price;
+                let discount = 0;
+
+                if (voucherId !== 'none') {
+                    const voucher = data.claimedVouchers.find(v => v.id == voucherId);
+                    if (voucher) {
+                        if (voucher.discountType === 'flat') discount = voucher.discountVal;
+                        else if (voucher.discountType === 'percent') discount = (originalPrice * voucher.discountVal) / 100;
+                        else if (voucher.discountType === 'free') discount = originalPrice;
+                    }
+                }
+                let finalPrice = Math.max(0, originalPrice - discount);
+                let earnedStars = Math.round(finalPrice * 0.5);
+
+                // Ensure family wallet exists
+                if (!data.familyWallets[student.family]) {
+                    data.familyWallets[student.family] = { wallet: 0, stars: 0, tier: 'Prelude' };
+                }
+
+                // Credit the earned stars
+                data.familyWallets[student.family].stars += earnedStars;
+
+                // Register student to workshop if not already registered
+                if (!workshop.registered) workshop.registered = [];
+                if (!workshop.registered.includes(student.name)) {
+                    workshop.registered.push(student.name);
+                }
+
                 data.transactions.unshift({
                     date: new Date().toISOString().split('T')[0],
                     student: student.name,
                     family: student.family,
                     desc: `Payment for ${workshop.title}`,
-                    amount: `- RM ${workshop.price.toFixed(2)}`,
-                    starsChange: '+10 ⭐'
+                    amount: `- RM ${finalPrice.toFixed(2)}`,
+                    starsChange: `+${earnedStars} ⭐`
                 });
+
                 saveData(data);
-                alert(`Checkout completed for ${studentName}!`);
+                alert(`Checkout completed for ${studentName}! Successfully earned +${earnedStars} ⭐.`);
             }
         }
 
@@ -350,7 +388,6 @@
 
             const data = getData();
             
-            // Check if student name already exists
             if (data.students.some(s => s.name.toLowerCase() === nameInput.toLowerCase())) {
                 alert('A student with this name already exists.');
                 return;
@@ -401,23 +438,19 @@
 
             const familyKey = student.family;
 
-            // Remove from students array
             data.students = data.students.filter(s => s.name !== studentName);
 
-            // Remove from workshop registrations
             data.workshops.forEach(w => {
                 if (w.registered) {
                     w.registered = w.registered.filter(name => name !== studentName);
                 }
             });
 
-            // If no other family members remain under this family key, remove the family wallet entry
             const remainingSiblings = data.students.filter(s => s.family === familyKey);
             if (remainingSiblings.length === 0) {
                 delete data.familyWallets[familyKey];
             }
 
-            // Log transaction audit
             data.transactions.unshift({
                 date: new Date().toISOString().split('T')[0],
                 student: studentName,
@@ -595,7 +628,6 @@
                     </div>
                 `).join('');
 
-            // Render Workshops List with Attendance Button
             document.getElementById('admin-workshops-list').innerHTML = data.workshops.length === 0 ?
                 `<p class="text-xs text-slate-400 italic">No workshops published yet.</p>` :
                 data.workshops.map(w => `
