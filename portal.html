@@ -5,196 +5,122 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Expressivo Club - Parent Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, doc, getDocs, updateDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyDHvyRDPEG9jzFbqSTuKmTjvnRDShmN6uU",
-            authDomain: "expressivo-club.firebaseapp.com",
-            projectId: "expressivo-club",
-            storageBucket: "expressivo-club.firebasestorage.app",
-            messagingSenderId: "562055940468",
-            appId: "1:562055940468:web:6691f8ad3a87954d660421"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        window.db = db;
-        window.portalData = { student: null, family: null, siblings: [], workshops: [], transactions: [] };
-
-        async function initPortal() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const studentName = urlParams.get('student');
-
-            onSnapshot(collection(db, "students"), (snapshot) => {
-                const students = [];
-                snapshot.forEach(d => students.push({ id: d.id, ...d.data() }));
-                
-                let found = students.find(s => s.name.toLowerCase() === (studentName || '').toLowerCase());
-                if (!found && students.length > 0) found = students[0];
-
-                if (found) {
-                    window.portalData.student = found;
-                    window.portalData.siblings = students.filter(s => s.family === found.family);
-
-                    onSnapshot(doc(db, "families", found.family), (famSnap) => {
-                        window.portalData.family = famSnap.exists() ? famSnap.data() : { wallet: 0, stars: 100, tier: 'Prelude' };
-                        updatePortalUI();
-                    });
-                }
-            });
-
-            onSnapshot(collection(db, "workshops"), (snapshot) => {
-                window.portalData.workshops = [];
-                snapshot.forEach(d => window.portalData.workshops.push({ id: d.id, ...d.data() }));
-                updatePortalUI();
-            });
-
-            onSnapshot(collection(db, "transactions"), (snapshot) => {
-                window.portalData.transactions = [];
-                snapshot.forEach(d => window.portalData.transactions.push({ id: d.id, ...d.data() }));
-                updatePortalUI();
-            });
-        }
-
-        window.claimVoucher = async function(title, cost) {
-            const data = window.portalData;
-            if (!data.family || (data.family.stars || 0) < cost) {
-                alert('Insufficient star balance to redeem this reward.');
-                return;
-            }
-
-            try {
-                const newStars = data.family.stars - cost;
-                await updateDoc(doc(db, "families", data.student.family), { stars: newStars });
-
-                await addDoc(collection(db, "vouchers"), {
-                    title: title,
-                    cost: cost,
-                    claimedBy: data.student.name,
-                    family: data.student.family,
-                    status: 'Pending Verification'
-                });
-
-                await addDoc(collection(db, "transactions"), {
-                    date: new Date().toISOString().split('T')[0],
-                    student: data.student.name,
-                    family: data.student.family,
-                    desc: `Redeemed Reward: ${title}`,
-                    amount: 'RM 0.00',
-                    starsChange: `-${cost} ⭐`
-                });
-
-                alert(`Reward "${title}" claimed successfully! Awaiting staff verification.`);
-            } catch (err) {
-                console.error("Error claiming reward: ", err);
-            }
-        };
-
-        window.registerWorkshop = async function(wId) {
-            const data = window.portalData;
-            const ws = data.workshops.find(w => w.id === wId);
-            if (!ws) return;
-
-            const registeredList = ws.registered || [];
-            if (registeredList.includes(data.student.name)) {
-                alert('Already registered for this workshop!');
-                return;
-            }
-
-            try {
-                registeredList.push(data.student.name);
-                await updateDoc(doc(db, "workshops", wId), { registered: registeredList });
-
-                const currentStars = data.family.stars || 0;
-                await updateDoc(doc(db, "families", data.student.family), { stars: currentStars + 15 });
-
-                await addDoc(collection(db, "transactions"), {
-                    date: new Date().toISOString().split('T')[0],
-                    student: data.student.name,
-                    family: data.student.family,
-                    desc: `Registered for Workshop: ${ws.title}`,
-                    amount: `- RM ${Number(ws.price).toFixed(2)}`,
-                    starsChange: '+15 ⭐'
-                });
-
-                alert(`Registered successfully for ${ws.title}! (+15 Stars earned)`);
-            } catch (err) {
-                console.error("Error registering workshop: ", err);
-            }
-        };
-
-        initPortal();
-    </script>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans p-4 sm:p-6">
 
     <div class="max-w-4xl mx-auto space-y-6">
+        <!-- Header -->
         <header class="bg-slate-900 text-white p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-                <h1 class="text-2xl font-bold" id="header-student-title">🎹 Welcome!</h1>
-                <p class="text-xs text-slate-400 mt-1">Expressivo Club - Family Member Portal</p>
+                <h1 class="text-2xl font-bold">🎹 Expressivo Club</h1>
+                <p class="text-xs text-slate-400 mt-1">Student & Family Member Portal</p>
             </div>
-            <div class="flex items-center gap-4">
-                <div class="text-right">
-                    <p class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Membership Tier</p>
-                    <p class="text-sm font-extrabold text-indigo-400" id="header-tier">Prelude</p>
-                </div>
-                <div class="flex items-center gap-3 bg-indigo-600/40 border border-indigo-500/50 px-4 py-2 rounded-xl">
-                    <div>
-                        <p class="text-[10px] text-indigo-200 uppercase tracking-wider font-bold">Family Star Balance</p>
-                        <p class="text-xl font-extrabold text-amber-300" id="header-stars">0 ⭐</p>
-                    </div>
+            <div class="flex items-center gap-3 bg-indigo-600/40 border border-indigo-500/50 px-4 py-2 rounded-xl">
+                <div>
+                    <p class="text-[10px] text-indigo-200 uppercase tracking-wider font-bold">Family Star Balance</p>
+                    <p class="text-xl font-extrabold text-amber-300" id="header-stars">0 ⭐</p>
                 </div>
             </div>
         </header>
 
+        <!-- Student Selector & Tier Badge -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div class="w-full sm:w-auto flex-1">
+                <label class="block text-xs font-bold text-slate-500 mb-1">Viewing Profile for Student:</label>
+                <select id="student-selector" onchange="switchActiveStudent()" class="w-full sm:w-72 border p-2.5 rounded-xl text-sm font-bold bg-slate-50 text-slate-800"></select>
+            </div>
+            <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                <div class="text-right">
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Membership Tier</p>
+                    <p class="text-sm font-extrabold text-indigo-600" id="header-tier">Prelude</p>
+                </div>
+                <button onclick="copyShareableLink()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">🔗 Copy Portal Link</button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
         <div class="flex bg-white p-2 rounded-xl shadow-sm border space-x-2 text-xs sm:text-sm font-semibold overflow-x-auto">
             <button onclick="switchTab('dashboard')" id="tab-dashboard" class="px-4 py-2 bg-slate-900 text-white rounded-lg whitespace-nowrap">🏠 Dashboard</button>
-            <button onclick="switchTab('rewards')" id="tab-rewards" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">🎁 Rewards Catalog</button>
+            <button onclick="switchTab('rewards')" id="tab-rewards" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">🎁 Rewards & Vouchers</button>
             <button onclick="switchTab('workshops')" id="tab-workshops" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">📅 Workshops & Events</button>
         </div>
 
-        <!-- TAB 1 -->
+        <!-- TAB 1: DASHBOARD -->
         <div id="content-dashboard" class="space-y-6">
+            <!-- Family Balance & Quick Stats -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-2">
                     <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Family Credit Wallet</p>
                     <p class="text-3xl font-extrabold text-slate-800" id="family-wallet-balance">RM 0.00</p>
-                    <p class="text-xs text-slate-500">Shared balance for tuition & materials.</p>
+                    <p class="text-xs text-slate-500">Usable across all siblings for tuition and class materials.</p>
                 </div>
                 <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-2">
-                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Siblings in Family</p>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Sibling Profiles in Family</p>
                     <div id="family-siblings-list" class="flex flex-wrap gap-2 pt-1"></div>
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-3">
-                <h3 class="text-sm font-bold text-slate-800 border-b pb-3">📜 Family & Student Transaction History</h3>
-                <div id="parent-transaction-history" class="space-y-2 text-xs"></div>
+            <!-- Referral Program Card -->
+            <div class="bg-gradient-to-br from-indigo-950 to-slate-900 text-white p-6 rounded-2xl shadow-lg space-y-3">
+                <h3 class="text-base font-bold text-indigo-200">🤝 Refer-a-Friend Program</h3>
+                <p class="text-xs text-slate-300">Invite friends to join Expressivo Club! When your friend registers using your student link, you instantly earn bonus stars.</p>
+                <div class="flex flex-col sm:flex-row gap-2 pt-1">
+                    <input type="text" id="referral-link-input" readonly class="w-full bg-slate-900 border border-indigo-800/80 p-2.5 rounded-xl text-xs font-mono text-indigo-300 select-all">
+                    <button onclick="copyReferralLink()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs whitespace-nowrap transition">Copy Link</button>
+                </div>
             </div>
         </div>
 
-        <!-- TAB 2: REWARDS CATALOG -->
+        <!-- TAB 2: REWARDS & VOUCHERS -->
         <div id="content-rewards" class="hidden space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                <h2 class="text-lg font-bold text-slate-800 border-b pb-3">Star Redemption Catalog</h2>
+                <h2 class="text-lg font-bold text-slate-800 border-b pb-3">Redeem Vouchers with Stars</h2>
                 <div id="rewards-list" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
             </div>
         </div>
 
-        <!-- TAB 3 -->
+        <!-- TAB 3: WORKSHOPS & EVENTS -->
         <div id="content-workshops" class="hidden space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                <h2 class="text-lg font-bold text-slate-800 border-b pb-3">Upcoming Workshops</h2>
+                <h2 class="text-lg font-bold text-slate-800 border-b pb-3">Upcoming Masterclasses & Workshops</h2>
                 <div id="parent-workshops-list" class="space-y-3"></div>
             </div>
         </div>
     </div>
 
     <script>
+        let currentStudentName = null;
+
+        function getData() {
+            let data = JSON.parse(localStorage.getItem('expressivo_data_v9'));
+            if (!data) {
+                data = { 
+                    referralBonusStars: 20,
+                    students: [
+                        { name: 'Alex Tan', family: 'family_1', contact: '+6012-8889999', dob: '2015-05-12', wallet: 250.00, tier: 'Prelude' },
+                        { name: 'Emma Tan', family: 'family_1', contact: '+6012-8889999', dob: '2017-08-20', wallet: 300.00, tier: 'Prelude' },
+                        { name: 'Lucas Lee', family: 'family_2', contact: '+6017-3334444', dob: '2014-01-05', wallet: 850.00, tier: 'Crescendo' }
+                    ],
+                    familyWallets: {
+                        'family_1': { wallet: 550.00, stars: 150, tier: 'Ensemble' },
+                        'family_2': { wallet: 850.00, stars: 1200, tier: 'Crescendo' }
+                    },
+                    claimedVouchers: [], 
+                    workshops: [
+                        { id: 101, title: "Masterclass Piano Technique", price: 88, exclusive: false, date: "Oct 15, 2026", registered: ['Alex Tan'] },
+                        { id: 102, title: "Advanced Violin Masterclass", price: 150, exclusive: true, date: "Oct 22, 2026", registered: ['Emma Tan'] }
+                    ],
+                    transactions: []
+                };
+            }
+            return data;
+        }
+
+        function saveData(data) {
+            localStorage.setItem('expressivo_data_v9', JSON.stringify(data));
+            updateParentUI();
+        }
+
         function switchTab(tab) {
             ['dashboard', 'rewards', 'workshops'].forEach(t => {
                 document.getElementById(`content-${t}`).classList.add('hidden');
@@ -204,74 +130,170 @@
             document.getElementById(`tab-${tab}`).className = "px-4 py-2 bg-slate-900 text-white rounded-lg whitespace-nowrap";
         }
 
-        function updatePortalUI() {
-            const data = window.portalData;
-            if (!data.student) return;
+        function switchActiveStudent() {
+            currentStudentName = document.getElementById('student-selector').value;
+            updateParentUI();
+        }
 
-            const fam = data.family || { wallet: 0, stars: 100, tier: 'Prelude' };
+        function claimVoucher(title, cost, discountType, discountVal) {
+            const data = getData();
+            const student = data.students.find(s => s.name === currentStudentName);
+            if (!student) return;
 
-            document.getElementById('header-student-title').innerText = `🎹 Welcome, ${data.student.name}!`;
-            document.getElementById('header-stars').innerText = `${fam.stars || 0} ⭐`;
-            document.getElementById('header-tier').innerText = `${fam.tier || 'Prelude'} Tier`;
-            document.getElementById('family-wallet-balance').innerText = `RM ${Number(fam.wallet || 0).toFixed(2)}`;
+            const family = data.familyWallets[student.family];
+            if (!family || family.stars < cost) {
+                alert('Insufficient star balance to claim this voucher.');
+                return;
+            }
 
-            document.getElementById('family-siblings-list').innerHTML = data.siblings.map(s => `
-                <span class="px-3 py-1 border text-xs font-bold rounded-lg ${s.name === data.student.name ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700'}">${s.name}</span>
+            family.stars -= cost;
+            data.claimedVouchers.push({
+                id: Date.now(),
+                title: title,
+                cost: cost,
+                discountType: discountType,
+                discountVal: discountVal,
+                claimedBy: student.name,
+                family: student.family,
+                status: 'Pending Verification'
+            });
+
+            data.transactions.unshift({
+                date: new Date().toISOString().split('T')[0],
+                student: student.name,
+                family: student.family,
+                desc: `Claimed Voucher: ${title}`,
+                amount: 'RM 0.00',
+                starsChange: `-${cost} ⭐`
+            });
+
+            saveData(data);
+            alert(`Voucher "${title}" claimed successfully! Pending staff verification.`);
+        }
+
+        function registerWorkshop(wId) {
+            const data = getData();
+            const student = data.students.find(s => s.name === currentStudentName);
+            const workshop = data.workshops.find(w => w.id === wId);
+            if (!student || !workshop) return;
+
+            const family = data.familyWallets[student.family] || { tier: 'Prelude' };
+
+            if (workshop.exclusive && family.tier === 'Prelude') {
+                alert('This workshop is exclusive for Crescendo or Virtuoso tier members.');
+                return;
+            }
+
+            if (workshop.registered.includes(student.name)) {
+                alert('You are already registered for this workshop!');
+                return;
+            }
+
+            workshop.registered.push(student.name);
+            data.transactions.unshift({
+                date: new Date().toISOString().split('T')[0],
+                student: student.name,
+                family: student.family,
+                desc: `Registered for Workshop: ${workshop.title}`,
+                amount: `- RM ${workshop.price.toFixed(2)}`,
+                starsChange: '+15 ⭐'
+            });
+
+            family.stars = (family.stars || 0) + 15;
+            saveData(data);
+            alert(`Successfully registered ${student.name} for "${workshop.title}"! (+15 Stars earned)`);
+        }
+
+        function copyShareableLink() {
+            const link = window.location.href.split('?')[0] + `?student=${encodeURIComponent(currentStudentName)}`;
+            navigator.clipboard.writeText(link);
+            alert(`Copied portal link for ${currentStudentName}!`);
+        }
+
+        function copyReferralLink() {
+            const link = window.location.href.split('?')[0] + `?student=${encodeURIComponent(currentStudentName)}`;
+            navigator.clipboard.writeText(link);
+            alert('Referral link copied! Share this link with friends.');
+        }
+
+        function updateParentUI() {
+            const data = getData();
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlStudent = urlParams.get('student');
+
+            if (!currentStudentName && urlStudent && data.students.some(s => s.name === urlStudent)) {
+                currentStudentName = urlStudent;
+            } else if (!currentStudentName || !data.students.some(s => s.name === currentStudentName)) {
+                currentStudentName = data.students[0] ? data.students[0].name : '';
+            }
+
+            const studentSelect = document.getElementById('student-selector');
+            studentSelect.innerHTML = data.students.map(s => `<option value="${s.name}" ${s.name === currentStudentName ? 'selected' : ''}>${s.name}</option>`).join('');
+
+            const student = data.students.find(s => s.name === currentStudentName);
+            if (!student) return;
+
+            const family = data.familyWallets[student.family] || { wallet: 0, stars: 0, tier: 'Prelude' };
+
+            document.getElementById('header-stars').innerText = `${family.stars} ⭐`;
+            document.getElementById('header-tier').innerText = `${family.tier} Tier`;
+            document.getElementById('family-wallet-balance').innerText = `RM ${family.wallet.toFixed(2)}`;
+
+            const siblings = data.students.filter(s => s.family === student.family);
+            document.getElementById('family-siblings-list').innerHTML = siblings.map(sib => `
+                <span class="px-3 py-1 bg-slate-100 border text-slate-700 text-xs font-bold rounded-lg ${sib.name === currentStudentName ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : ''}">${sib.name}</span>
             `).join('');
 
-            const familyTx = data.transactions.filter(t => t.family === data.student.family || t.student === data.student.name);
-            document.getElementById('parent-transaction-history').innerHTML = familyTx.length === 0 ?
-                `<p class="text-slate-400 italic">No transaction history yet.</p>` :
-                familyTx.map(t => `
-                    <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center text-xs">
-                        <div>
-                            <p class="font-bold text-slate-800">${t.desc} <span class="text-slate-500 font-normal">(${t.student})</span></p>
-                            <p class="text-slate-400 text-[10px]">${t.date}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="font-bold ${t.amount && t.amount.startsWith('-') ? 'text-rose-600' : 'text-emerald-600'}">${t.amount || 'RM 0.00'}</p>
-                            <p class="text-amber-600 text-[10px] font-bold">${t.starsChange || ''}</p>
-                        </div>
-                    </div>
-                `).join('');
+            const referralInput = document.getElementById('referral-link-input');
+            if (referralInput) {
+                referralInput.value = window.location.href.split('?')[0] + `?student=${encodeURIComponent(currentStudentName)}`;
+            }
 
-            // Exact Reward Catalog Tiers requested
+            // Updated Rewards Catalog
             const rewards = [
-                { title: "RM5 Off Workshop", cost: 100 },
-                { title: "RM10 Off Workshop", cost: 200 },
-                { title: "RM20 Off Workshop", cost: 400 },
-                { title: "50% Off Workshop", cost: 600 },
-                { title: "FREE Workshop", cost: 1000 }
+                { title: "RM5 Off Workshop", cost: 100, type: "flat", val: 5 },
+                { title: "RM10 Off Workshop", cost: 200, type: "flat", val: 10 },
+                { title: "RM20 Off Workshop", cost: 400, type: "flat", val: 20 },
+                { title: "50% Off Workshop", cost: 600, type: "percent", val: 50 },
+                { title: "FREE Workshop", cost: 1000, type: "free", val: 100 }
             ];
 
             document.getElementById('rewards-list').innerHTML = rewards.map(r => `
-                <div class="bg-slate-50 p-4 rounded-xl border flex justify-between items-center">
+                <div class="bg-slate-50 p-4 rounded-xl border space-y-3 flex flex-col justify-between">
                     <div>
                         <h4 class="font-bold text-slate-800 text-sm">${r.title}</h4>
-                        <p class="text-xs text-amber-600 font-semibold">${r.cost} Stars</p>
+                        <p class="text-xs text-amber-600 font-semibold mt-0.5">${r.cost} Stars Required</p>
                     </div>
-                    <button onclick="claimVoucher('${r.title}', ${r.cost})" class="px-4 py-2 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 transition">Redeem</button>
+                    <button onclick="claimVoucher('${r.title}', ${r.cost}, '${r.type}', ${r.val})" class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition">Redeem Voucher</button>
                 </div>
             `).join('');
 
+            // Render Workshops
             document.getElementById('parent-workshops-list').innerHTML = data.workshops.length === 0 ?
-                `<p class="text-slate-400 italic text-xs">No upcoming workshops scheduled.</p>` :
+                `<p class="text-xs text-slate-400 italic">No upcoming workshops scheduled.</p>` :
                 data.workshops.map(w => {
-                    const isReg = (w.registered || []).includes(data.student.name);
+                    const isRegistered = w.registered.includes(student.name);
+                    const isExclusiveLocked = w.exclusive && family.tier === 'Prelude';
                     return `
-                        <div class="bg-slate-50 p-4 rounded-xl border flex justify-between items-center text-xs">
+                        <div class="bg-slate-50 p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
                             <div>
-                                <h4 class="font-bold text-slate-800">${w.title}</h4>
-                                <p class="text-slate-500">Date: ${w.date} | Price: RM ${w.price}</p>
+                                <h4 class="font-bold text-slate-800 text-sm">${w.title} ${w.exclusive ? '<span class="text-amber-600">⭐ Exclusive</span>' : ''}</h4>
+                                <p class="text-slate-500">Date: <span class="font-semibold text-slate-700">${w.date}</span> | Price: <span class="font-semibold text-slate-700">RM ${w.price}</span></p>
                             </div>
                             <div>
-                                ${isReg ? `<span class="px-3 py-1 bg-emerald-100 text-emerald-700 font-bold rounded-lg">Registered ✓</span>` :
-                                `<button onclick="registerWorkshop('${w.id}')" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition">Book Workshop</button>`}
+                                ${isRegistered ? 
+                                    `<span class="px-4 py-2 bg-emerald-500/20 text-emerald-700 font-bold rounded-xl inline-block">Registered ✓</span>` :
+                                    isExclusiveLocked ? 
+                                    `<span class="px-4 py-2 bg-amber-500/20 text-amber-700 font-bold rounded-xl inline-block">Tier Locked 🔒</span>` :
+                                    `<button onclick="registerWorkshop(${w.id})" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition">Book Workshop</button>`
+                                }
                             </div>
                         </div>
                     `;
                 }).join('');
         }
+
+        updateParentUI();
     </script>
 </body>
 </html>
