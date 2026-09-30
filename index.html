@@ -19,7 +19,7 @@
 
     <main class="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
 
-        <!-- Student Info Header (No Dropdown, Direct View) -->
+        <!-- Student Info Header -->
         <div class="bg-white p-5 rounded-2xl shadow-sm border flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
                 <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">Logged-In Student</p>
@@ -51,7 +51,7 @@
                 <div>
                     <span class="text-xs bg-indigo-500/30 text-indigo-200 px-3 py-1 rounded-full font-semibold border border-indigo-400/30">Member Rewards</span>
                     <h2 class="text-2xl font-bold mt-2">Unlock Studio Vouchers</h2>
-                    <p class="text-xs sm:text-sm text-slate-300 mt-1">Redeem your earned stars for tuition discounts, free workshop passes, and exclusive studio merch.</p>
+                    <p class="text-xs sm:text-sm text-slate-300 mt-1">Redeem earned stars for instantly applicable tuition discounts and workshop passes!</p>
                 </div>
                 <div class="text-center sm:text-right bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/10 min-w-[140px]">
                     <p class="text-xs text-indigo-200 uppercase tracking-wide">Available Stars</p>
@@ -91,6 +91,14 @@
     </main>
 
     <script>
+        const studioVouchers = [
+            { id: 1, title: "RM 5 Off Voucher", cost: 100, discountType: 'flat', discountVal: 5, desc: "Deduct RM 5 off your invoice." },
+            { id: 2, title: "RM 10 Off Voucher", cost: 200, discountType: 'flat', discountVal: 10, desc: "Deduct RM 10 off your invoice." },
+            { id: 3, title: "RM 20 Off Voucher", cost: 400, discountType: 'flat', discountVal: 20, desc: "Deduct RM 20 off your invoice." },
+            { id: 4, title: "50% Off Voucher", cost: 600, discountType: 'percent', discountVal: 50, desc: "Get 50% discount on workshops or events." },
+            { id: 5, title: "Free Workshop Pass", cost: 1000, discountType: 'free', discountVal: 100, desc: "Redeem 1 free entry pass for any studio workshop." }
+        ];
+
         function getData() {
             let data = JSON.parse(localStorage.getItem('expressivo_data_v9'));
             if (!data) {
@@ -126,11 +134,9 @@
             let student = params.get('student');
             const data = getData();
             
-            // If student name in link exists, use it
             if (student && data.students.some(s => s.name.toLowerCase() === student.toLowerCase())) {
                 return data.students.find(s => s.name.toLowerCase() === student.toLowerCase()).name;
             }
-            // Fallback to the first student if link has no param
             return data.students[0] ? data.students[0].name : '';
         }
 
@@ -143,30 +149,34 @@
             document.getElementById(`ptab-${tab}`).className = "px-4 py-2 bg-indigo-600 text-white rounded-lg transition whitespace-nowrap";
         }
 
-        function claimVoucher(id, cost, title) {
+        function claimVoucher(vId) {
             const data = getData();
             const currentStudent = getActiveStudentName();
             const studentObj = data.students.find(s => s.name === currentStudent);
             if (!studentObj) return;
             const familyObj = data.familyWallets[studentObj.family];
+            const voucher = studioVouchers.find(v => v.id === vId);
 
-            if (familyObj.stars < cost) {
+            if (!voucher) return;
+            if (familyObj.stars < voucher.cost) {
                 alert('Insufficient stars to claim this voucher.');
                 return;
             }
 
-            familyObj.stars -= cost;
+            familyObj.stars -= voucher.cost;
             data.claimedVouchers.push({
                 id: Date.now(),
                 family: studentObj.family,
                 claimedBy: currentStudent,
-                title: title,
-                cost: cost,
+                title: voucher.title,
+                cost: voucher.cost,
+                discountType: voucher.discountType,
+                discountVal: voucher.discountVal,
                 status: 'Pending Verification'
             });
 
             saveData(data);
-            alert('Voucher successfully claimed! Present it to the admin desk to scan and approve.');
+            alert(`Successfully claimed "${voucher.title}"! Show it to the admin desk to redeem.`);
         }
 
         function bookWorkshop(workshopId) {
@@ -217,15 +227,9 @@
             document.getElementById('top-tier-badge').innerText = `${familyObj.tier} Tier`;
 
             const baseUrl = window.location.href.split('?')[0];
-            document.getElementById('referral-link-input').value = `${baseUrl}?ref=${encodeURIComponent(currentStudentObj.name)}`;
+            document.getElementById('referral-link-input').value = `${baseUrl}?student=${encodeURIComponent(currentStudentObj.name)}`;
 
-            const rewardsList = [
-                { id: 1, title: "RM 20 Tuition Discount", cost: 100, desc: "Deduct RM20 off your next invoice payment." },
-                { id: 2, title: "Free Workshop Pass", cost: 250, desc: "Claim 100% discount on any regular studio workshop." },
-                { id: 3, title: "50% Off Merchandise", cost: 180, desc: "Half-price discount on books, bags, or club merch." }
-            ];
-
-            document.getElementById('rewards-grid').innerHTML = rewardsList.map(r => `
+            document.getElementById('rewards-grid').innerHTML = studioVouchers.map(r => `
                 <div class="bg-white p-5 rounded-2xl shadow-sm border flex flex-col justify-between space-y-4">
                     <div>
                         <div class="flex justify-between items-start">
@@ -234,7 +238,7 @@
                         </div>
                         <p class="text-xs text-slate-500 mt-2">${r.desc}</p>
                     </div>
-                    <button onclick="claimVoucher(${r.id}, ${r.cost}, '${r.title}')" class="w-full py-2 bg-indigo-600 text-white font-semibold rounded-xl text-xs hover:bg-indigo-700 transition">Claim Voucher</button>
+                    <button onclick="claimVoucher(${r.id})" class="w-full py-2 bg-indigo-600 text-white font-semibold rounded-xl text-xs hover:bg-indigo-700 transition">Claim Voucher</button>
                 </div>
             `).join('');
 
@@ -245,7 +249,7 @@
                     <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center text-xs">
                         <div>
                             <p class="font-bold text-slate-700">${v.title} <span class="text-indigo-600 font-semibold">(${v.claimedBy})</span></p>
-                            <p class="text-slate-400">Cost: ${v.cost} Stars | Status: <span class="font-semibold text-amber-600">${v.status}</span></p>
+                            <p class="text-slate-400">Cost: ${v.cost} Stars | Status: <span class="font-semibold ${v.status === 'Approved & Redeemed' ? 'text-emerald-600' : 'text-amber-600'}">${v.status}</span></p>
                         </div>
                     </div>
                 `).join('');
