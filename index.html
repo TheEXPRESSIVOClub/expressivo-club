@@ -42,6 +42,7 @@
         <div class="flex bg-white p-2 rounded-xl shadow-sm border space-x-2 text-xs sm:text-sm font-semibold overflow-x-auto">
             <button onclick="switchParentTab('rewards')" id="ptab-rewards" class="px-4 py-2 bg-indigo-600 text-white rounded-lg transition whitespace-nowrap">🎁 Rewards & Vouchers</button>
             <button onclick="switchParentTab('workshops')" id="ptab-workshops" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg transition whitespace-nowrap">📅 Workshops & Events</button>
+            <button onclick="switchParentTab('history')" id="ptab-history" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg transition whitespace-nowrap">📜 My History</button>
             <button onclick="switchParentTab('referrals')" id="ptab-referrals" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg transition whitespace-nowrap">👥 Friend Referrals</button>
         </div>
 
@@ -76,7 +77,16 @@
             </div>
         </div>
 
-        <!-- TAB 3: Friend Referrals -->
+        <!-- TAB 3: Transaction History -->
+        <div id="parent-content-history" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+                <h3 class="text-lg font-bold text-slate-800">📜 Account & Transaction History</h3>
+                <p class="text-xs text-slate-500">Track all past activity including tuition payments, workshop bookings, and earned reward stars.</p>
+                <div id="parent-history-list" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- TAB 4: Friend Referrals -->
         <div id="parent-content-referrals" class="hidden space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border max-w-lg mx-auto p-6 space-y-4 text-center">
                 <h3 class="text-lg font-bold text-slate-800">👥 Refer a Friend</h3>
@@ -105,19 +115,22 @@
                 data = { 
                     referralBonusStars: 20,
                     students: [
-                        { name: 'Alex Tan', family: 'family_1', wallet: 250.00, tier: 'Prelude' },
-                        { name: 'Emma Tan', family: 'family_1', wallet: 300.00, tier: 'Prelude' },
-                        { name: 'Lucas Lee', family: 'family_2', wallet: 850.00, tier: 'Crescendo' }
+                        { name: 'Alex Tan', family: 'family_1', contact: '+6012-8889999', dob: '2015-05-12', wallet: 250.00, tier: 'Prelude' },
+                        { name: 'Emma Tan', family: 'family_1', contact: '+6012-8889999', dob: '2017-08-20', wallet: 300.00, tier: 'Prelude' },
+                        { name: 'Lucas Lee', family: 'family_2', contact: '+6017-3334444', dob: '2014-01-05', wallet: 850.00, tier: 'Crescendo' }
                     ],
                     familyWallets: {
                         'family_1': { wallet: 550.00, stars: 150, tier: 'Ensemble' },
                         'family_2': { wallet: 850.00, stars: 420, tier: 'Crescendo' }
                     },
                     claimedVouchers: [], 
-                    bookings: [],
                     workshops: [
                         { id: 101, title: "Masterclass Piano Technique", price: 88, exclusive: false, date: "Oct 15, 2026", registered: ['Alex Tan'] },
                         { id: 102, title: "Advanced Violin Masterclass", price: 150, exclusive: true, date: "Oct 22, 2026", registered: ['Emma Tan'] }
+                    ],
+                    transactions: [
+                        { date: '2026-09-28', student: 'Alex Tan', family: 'family_1', desc: 'Registered for Piano Technique Workshop', amount: '- RM 88.00', starsChange: '+20 ⭐' },
+                        { date: '2026-09-25', student: 'Alex Tan', family: 'family_1', desc: 'Claimed RM20 Off Voucher', amount: '0.00', starsChange: '-400 ⭐' }
                     ]
                 };
             }
@@ -133,7 +146,6 @@
             const params = new URLSearchParams(window.location.search);
             let student = params.get('student');
             const data = getData();
-            
             if (student && data.students.some(s => s.name.toLowerCase() === student.toLowerCase())) {
                 return data.students.find(s => s.name.toLowerCase() === student.toLowerCase()).name;
             }
@@ -141,7 +153,7 @@
         }
 
         function switchParentTab(tab) {
-            ['rewards', 'workshops', 'referrals'].forEach(t => {
+            ['rewards', 'workshops', 'history', 'referrals'].forEach(t => {
                 document.getElementById(`parent-content-${t}`).classList.add('hidden');
                 document.getElementById(`ptab-${t}`).className = "px-4 py-2 bg-slate-100 text-slate-600 rounded-lg transition whitespace-nowrap";
             });
@@ -175,6 +187,15 @@
                 status: 'Pending Verification'
             });
 
+            data.transactions.unshift({
+                date: new Date().toISOString().split('T')[0],
+                student: currentStudent,
+                family: studentObj.family,
+                desc: `Claimed Voucher: ${voucher.title}`,
+                amount: 'RM 0.00',
+                starsChange: `-${voucher.cost} ⭐`
+            });
+
             saveData(data);
             alert(`Successfully claimed "${voucher.title}"! Show it to the admin desk to redeem.`);
         }
@@ -199,6 +220,16 @@
             }
 
             workshop.registered.push(currentStudent);
+            
+            data.transactions.unshift({
+                date: new Date().toISOString().split('T')[0],
+                student: currentStudent,
+                family: studentObj.family,
+                desc: `Workshop Registration: ${workshop.title}`,
+                amount: `- RM ${workshop.price.toFixed(2)}`,
+                starsChange: '+10 ⭐'
+            });
+
             saveData(data);
             alert(`Workshop successfully booked for ${currentStudent}!`);
         }
@@ -268,6 +299,22 @@
                     </div>
                 `;
             }).join('');
+
+            const myHistory = (data.transactions || []).filter(t => t.family === currentStudentObj.family || t.student === currentStudentObj.name);
+            document.getElementById('parent-history-list').innerHTML = myHistory.length === 0 ?
+                `<p class="text-xs text-slate-400 italic">No transactions recorded yet.</p>` :
+                myHistory.map(t => `
+                    <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center text-xs">
+                        <div>
+                            <p class="font-bold text-slate-800">${t.desc} <span class="text-indigo-600 font-normal">(${t.student})</span></p>
+                            <p class="text-slate-400 text-[11px]">${t.date}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold ${t.amount.startsWith('-') ? 'text-slate-800' : 'text-emerald-600'}">${t.amount}</p>
+                            <p class="text-indigo-600 font-semibold text-[11px]">${t.starsChange}</p>
+                        </div>
+                    </div>
+                `).join('');
         }
 
         updateUI();
