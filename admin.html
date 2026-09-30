@@ -149,7 +149,7 @@
                 <div id="admin-students-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
             </div>
 
-            <!-- Detailed Student View Modal/Section -->
+            <!-- Detailed Student View Modal/Section with Bonus Star Adder -->
             <div id="student-detail-card" class="hidden bg-indigo-900 text-white p-6 rounded-2xl shadow-lg space-y-4">
                 <div class="flex justify-between items-start border-b border-indigo-700 pb-3">
                     <div>
@@ -158,6 +158,7 @@
                     </div>
                     <button onclick="closeDetailCard()" class="text-xs bg-indigo-800 px-3 py-1 rounded-lg hover:bg-indigo-700">Close ✕</button>
                 </div>
+                
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                     <div>
                         <p class="text-indigo-300 uppercase">Contact Number</p>
@@ -176,6 +177,24 @@
                         <p class="font-bold text-sm mt-0.5 text-indigo-200" id="detail-tier">Prelude</p>
                     </div>
                 </div>
+
+                <!-- Add Bonus Star Control -->
+                <div class="bg-indigo-950 p-4 rounded-xl border border-indigo-700 space-y-3">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-amber-300">⭐ Award Manual Bonus Stars</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-indigo-300 mb-1">Stars Amount</label>
+                            <input type="number" id="bonus-star-input" placeholder="e.g. 50" class="w-full bg-indigo-900 border border-indigo-700 text-white p-2 rounded-lg text-xs">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-[10px] text-indigo-300 mb-1">Reason / Note</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="bonus-star-reason" placeholder="e.g. Outstanding Recital Performance" class="w-full bg-indigo-900 border border-indigo-700 text-white p-2 rounded-lg text-xs">
+                                <button onclick="awardBonusStars()" class="px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-xs whitespace-nowrap transition">Add Stars</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="pt-2">
                     <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-300 mb-2">Student Transaction & Audit History</h4>
@@ -186,6 +205,8 @@
     </div>
 
     <script>
+        let currentSelectedStudent = null;
+
         function getData() {
             let data = JSON.parse(localStorage.getItem('expressivo_data_v9'));
             if (!data) {
@@ -217,6 +238,9 @@
         function saveData(data) {
             localStorage.setItem('expressivo_data_v9', JSON.stringify(data));
             updateAdminUI();
+            if (currentSelectedStudent) {
+                viewStudentDetail(currentSelectedStudent);
+            }
         }
 
         function switchTab(tab) {
@@ -345,6 +369,69 @@
             saveData(data);
         }
 
+        function deleteStudent(studentName) {
+            if (!confirm(`Are you sure you want to remove ${studentName}? This action cannot be undone.`)) return;
+            const data = getData();
+            const student = data.students.find(s => s.name === studentName);
+            if (!student) return;
+
+            // Remove from students list
+            data.students = data.students.filter(s => s.name !== studentName);
+
+            // Also remove from any workshop registrations
+            data.workshops.forEach(w => {
+                w.registered = w.registered.filter(name => name !== studentName);
+            });
+
+            // Log transaction audit
+            data.transactions.unshift({
+                date: new Date().toISOString().split('T')[0],
+                student: studentName,
+                family: student.family,
+                desc: 'Student Profile Removed by Admin',
+                amount: 'RM 0.00',
+                starsChange: '0 ⭐'
+            });
+
+            closeDetailCard();
+            saveData(data);
+            alert(`Student ${studentName} has been successfully removed.`);
+        }
+
+        function awardBonusStars() {
+            const starsToAdd = parseInt(document.getElementById('bonus-star-input').value);
+            const reason = document.getElementById('bonus-star-reason').value.trim() || 'Manual Admin Bonus';
+
+            if (isNaN(starsToAdd) || starsToAdd <= 0) {
+                alert('Please enter a valid star amount greater than 0.');
+                return;
+            }
+
+            const data = getData();
+            const student = data.students.find(s => s.name === currentSelectedStudent);
+            if (!student) return;
+
+            if (!data.familyWallets[student.family]) {
+                data.familyWallets[student.family] = { wallet: 0, stars: 0, tier: 'Prelude' };
+            }
+
+            data.familyWallets[student.family].stars += starsToAdd;
+
+            data.transactions.unshift({
+                date: new Date().toISOString().split('T')[0],
+                student: student.name,
+                family: student.family,
+                desc: `Bonus Award: ${reason}`,
+                amount: 'RM 0.00',
+                starsChange: `+${starsToAdd} ⭐`
+            });
+
+            document.getElementById('bonus-star-input').value = '';
+            document.getElementById('bonus-star-reason').value = '';
+            saveData(data);
+            alert(`Successfully awarded +${starsToAdd} Stars to ${student.name}'s family account!`);
+        }
+
         function createNewWorkshop() {
             const title = document.getElementById(' workshop-title').value.trim() || document.getElementById('workshop-title')?.value.trim();
             const price = parseFloat(document.getElementById('workshop-price').value);
@@ -413,6 +500,7 @@
         }
 
         function viewStudentDetail(studentName) {
+            currentSelectedStudent = studentName;
             const data = getData();
             const student = data.students.find(s => s.name === studentName);
             if (!student) return;
@@ -447,6 +535,7 @@
         }
 
         function closeDetailCard() {
+            currentSelectedStudent = null;
             document.getElementById('student-detail-card').classList.add('hidden');
         }
 
@@ -494,7 +583,10 @@
                 <div class="bg-slate-50 p-3 rounded-xl border space-y-2 text-xs">
                     <div class="flex justify-between items-center">
                         <button onclick="viewStudentDetail('${s.name}')" class="font-bold text-indigo-700 hover:underline text-sm">${s.name} 🔍</button>
-                        <span class="text-slate-500 font-semibold">${data.familyWallets[s.family]?.stars || 0} ⭐</span>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-slate-500 font-semibold">${data.familyWallets[s.family]?.stars || 0} ⭐</span>
+                            <button onclick="deleteStudent('${s.name}')" class="bg-rose-100 text-rose-700 px-2 py-1 rounded hover:bg-rose-200 font-semibold">Remove</button>
+                        </div>
                     </div>
                     <p class="text-slate-500">Contact: <span class="text-slate-800 font-medium">${s.contact || 'N/A'}</span> | DOB: <span class="text-slate-800 font-medium">${s.dob || 'N/A'}</span></p>
                     <div class="font-mono text-indigo-600 bg-white px-2 py-1 rounded border select-all overflow-x-auto text-[11px]">
