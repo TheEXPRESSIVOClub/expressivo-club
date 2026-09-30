@@ -248,7 +248,7 @@
         ];
 
         function getData() {
-            let data = JSON.parse(localStorage.getItem('expressivo_data_v7'));
+            let data = JSON.parse(localStorage.getItem('expressivo_data_v8'));
             if (!data) {
                 data = { 
                     currentStudent: 'Alex Tan',
@@ -275,7 +275,7 @@
         }
 
         function saveData(data) {
-            localStorage.setItem('expressivo_data_v7', JSON.stringify(data));
+            localStorage.setItem('expressivo_data_v8', JSON.stringify(data));
             updateUI();
         }
 
@@ -366,6 +366,7 @@
             const data = getData();
             const studentName = document.getElementById('pos-student').value;
             const studentObj = data.students.find(s => s.name === studentName);
+            if (!studentObj) return;
             const familyObj = data.familyWallets[studentObj.family];
             const itemVal = document.getElementById('pos-item').value;
             const voucherVal = document.getElementById('pos-voucher').value;
@@ -423,6 +424,7 @@
             const reward = rewardsCatalog.find(r => r.id === rewardId);
             const data = getData();
             const studentObj = data.students.find(s => s.name === data.currentStudent);
+            if (!studentObj) return;
             const familyObj = data.familyWallets[studentObj.family];
 
             if (familyObj.stars < reward.cost) {
@@ -450,6 +452,7 @@
         function adminApproveVoucher(voucherId) {
             const data = getData();
             const voucher = data.claimedVouchers.find(v => v.id == voucherId);
+            if (!voucher) return;
             const familyObj = data.familyWallets[voucher.family];
 
             if (voucher && familyObj && familyObj.stars >= voucher.cost) {
@@ -477,6 +480,7 @@
 
             const data = getData();
             const studentObj = data.students.find(s => s.name === studentName);
+            if (!studentObj) return;
             const familyObj = data.familyWallets[studentObj.family];
             const stars = type === 'Friend Referral' ? data.referralBonusStars : 50;
 
@@ -518,6 +522,7 @@
         function bookWorkshop(workshopId) {
             const data = getData();
             const studentObj = data.students.find(s => s.name === data.currentStudent);
+            if (!studentObj) return;
             const familyObj = data.familyWallets[studentObj.family];
             const workshop = data.workshops.find(w => w.id === workshopId);
 
@@ -590,12 +595,59 @@
             alert(`Student ${name} successfully registered and linked to ${family}!`);
         }
 
+        function deleteStudent(name) {
+            const data = getData();
+            const studentObj = data.students.find(s => s.name === name);
+            if (!studentObj) return;
+
+            if (confirm(`Are you sure you want to remove ${name}?`)) {
+                const familyName = studentObj.family;
+                
+                // Remove student from student list
+                data.students = data.students.filter(s => s.name !== name);
+
+                // Remove from workshop rosters
+                data.workshops.forEach(w => {
+                    w.registered = w.registered.filter(r => r !== name);
+                });
+
+                // Check if any other siblings remain in this family
+                const remainingSiblings = data.students.filter(s => s.family === familyName);
+                if (remainingSiblings.length === 0) {
+                    // Delete family wallet if no children left
+                    delete data.familyWallets[familyName];
+                }
+
+                // Update current student if needed
+                if (data.currentStudent === name) {
+                    data.currentStudent = data.students.length > 0 ? data.students[0].name : '';
+                }
+
+                data.ledger.unshift({
+                    date: new Date().toLocaleDateString(),
+                    desc: `Removed Student: ${name}`,
+                    change: `System`,
+                    user: familyName
+                });
+
+                saveData(data);
+                alert(`Student ${name} successfully deleted.`);
+            }
+        }
+
         function filterStudents() {
             updateUI();
         }
 
         function updateUI() {
             const data = getData();
+            if (data.students.length === 0) {
+                // Prevent empty state crash
+                data.students.push({ name: 'Default Student', family: 'Default Family', wallet: 250, tier: 'Prelude' });
+                data.familyWallets['Default Family'] = { wallet: 250, stars: 50, tier: 'Prelude' };
+                data.currentStudent = 'Default Student';
+            }
+
             const studentObj = data.students.find(s => s.name === data.currentStudent) || data.students[0];
             data.currentStudent = studentObj.name;
             const familyObj = data.familyWallets[studentObj.family] || { wallet: 0, stars: 0, tier: 'Prelude' };
@@ -626,7 +678,7 @@
                     `<option value="${v.id}|${v.cost}|${v.freeWorkshop ? 'freeWorkshop' : (v.discountPercent ? 'discountPercent' : 'discountAmount')}|${v.title}">${v.title} (${v.cost} stars)</option>`
                 ).join('');
 
-            // Rewards Grid - Dynamic Insufficient Stars Check
+            // Rewards Grid
             document.getElementById('rewards-grid').innerHTML = rewardsCatalog.map(r => {
                 const isInsufficient = familyObj.stars < r.cost;
                 return `
@@ -692,21 +744,24 @@
                 `;
             }).join('');
 
-            // Admin Student Directory with Search
+            // Admin Student Directory with Search & Delete Button
             const searchVal = (document.getElementById('student-search-input')?.value || '').toLowerCase();
             const filteredStudents = data.students.filter(s => s.name.toLowerCase().includes(searchVal) || s.family.toLowerCase().includes(searchVal));
             
             document.getElementById('admin-students-list').innerHTML = filteredStudents.length === 0 ?
                 `<p class="text-sm text-slate-400 italic">No students found.</p>` :
                 filteredStudents.map(s => {
-                    const fam = data.familyWallets[s.family];
+                    const fam = data.familyWallets[s.family] || { tier: 'Prelude', stars: 0, wallet: 0 };
                     return `
-                        <div class="bg-white p-4 rounded-xl border flex justify-between items-center text-sm">
+                        <div class="bg-white p-4 rounded-xl border flex justify-between items-center text-sm gap-2">
                             <div>
                                 <h4 class="font-bold text-slate-800">${s.name} <span class="text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded ml-2 font-normal">${s.family}</span></h4>
                                 <p class="text-xs text-slate-500 mt-0.5">Family Tier: <span class="font-semibold text-indigo-600">${fam.tier}</span> | Shared Stars: <span class="font-semibold text-indigo-600">${fam.stars}</span> | Family Wallet: RM${fam.wallet.toFixed(2)}</p>
                             </div>
-                            <button onclick="switchParentActiveStudent('${s.name}'); switchView('parent');" class="px-3 py-1.5 bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg hover:bg-slate-200">View Portal</button>
+                            <div class="flex space-x-2">
+                                <button onclick="switchParentActiveStudent('${s.name}'); switchView('parent');" class="px-3 py-1.5 bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg hover:bg-slate-200 whitespace-nowrap">View Portal</button>
+                                <button onclick="deleteStudent('${s.name}')" class="px-3 py-1.5 bg-rose-50 text-rose-600 font-semibold text-xs rounded-lg hover:bg-rose-100 whitespace-nowrap">Delete</button>
+                            </div>
                         </div>
                     `;
                 }).join('');
