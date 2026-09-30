@@ -34,7 +34,6 @@
                 
                 if (students.length === 0) return;
 
-                // Find student matching URL parameter, or default to the first student
                 let found = null;
                 if (studentParam) {
                     found = students.find(s => s.name.toLowerCase() === decodeURIComponent(studentParam).toLowerCase());
@@ -47,7 +46,6 @@
                     window.portalData.student = found;
                     window.portalData.siblings = students.filter(s => s.family === found.family);
 
-                    // Listen to family wallet & stars
                     onSnapshot(doc(db, "families", found.family), (famSnap) => {
                         window.portalData.family = famSnap.exists() ? famSnap.data() : { wallet: 0, stars: 100, tier: 'Prelude' };
                         updatePortalUI();
@@ -145,8 +143,9 @@
     <div class="max-w-4xl mx-auto space-y-6">
         <header class="bg-slate-900 text-white p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-                <h1 class="text-2xl font-bold" id="header-student-title">🎹 Welcome!</h1>
-                <p class="text-xs text-slate-400 mt-1">Expressivo Club - Family Member Portal</p>
+                <h1 class="text-2xl font-bold" id="header-student-title">🎹 Family Portal</h1>
+                <p class="text-xs text-indigo-300 font-semibold mt-1" id="header-student-subtitle">Loading student details...</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Expressivo Club - Member Portal</p>
             </div>
             <div class="flex items-center gap-4">
                 <div class="text-right">
@@ -177,7 +176,7 @@
                     <p class="text-xs text-slate-500">Shared balance for tuition & materials.</p>
                 </div>
                 <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-2">
-                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Siblings in Family</p>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Siblings / Associated Students</p>
                     <div id="family-siblings-list" class="flex flex-wrap gap-2 pt-1"></div>
                 </div>
             </div>
@@ -221,13 +220,14 @@
 
             const fam = data.family || { wallet: 0, stars: 100, tier: 'Prelude' };
 
-            document.getElementById('header-student-title').innerText = `🎹 Welcome, ${data.student.name}!`;
+            document.getElementById('header-student-title').innerText = `🎹 Family Portal`;
+            document.getElementById('header-student-subtitle').innerText = `Viewing Student: ${data.student.name} (Contact: ${data.student.contact})`;
             document.getElementById('header-stars').innerText = `${fam.stars ?? 100} ⭐`;
             document.getElementById('header-tier').innerText = `${fam.tier || 'Prelude'} Tier`;
             document.getElementById('family-wallet-balance').innerText = `RM ${Number(fam.wallet || 0).toFixed(2)}`;
 
             document.getElementById('family-siblings-list').innerHTML = data.siblings.map(s => `
-                <span class="px-3 py-1 border text-xs font-bold rounded-lg ${s.name === data.student.name ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700'}">${s.name}</span>
+                <span class="px-3 py-1.5 border text-xs font-bold rounded-lg ${s.name === data.student.name ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700'}">${s.name} (${s.contact})</span>
             `).join('');
 
             const familyTx = data.transactions.filter(t => t.family === data.student.family || t.student === data.student.name);
@@ -246,7 +246,6 @@
                     </div>
                 `).join('');
 
-            // Full exact reward catalog list as requested
             const rewards = [
                 { title: "RM5 Off Workshop", cost: 100, desc: "Redeem 100 stars for RM5 off any workshop." },
                 { title: "RM10 Off Workshop", cost: 200, desc: "Redeem 200 stars for RM10 off any workshop." },
