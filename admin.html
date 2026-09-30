@@ -5,12 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Expressivo Club - Admin Dashboard (Live)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase SDK Imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, doc, getDocs, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Your exact Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDHvyRDPEG9jzFbqSTuKmTjvnRDShmN6uU",
             authDomain: "expressivo-club.firebaseapp.com",
@@ -24,16 +22,13 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Global state for admin
         window.db = db;
         window.appData = { students: [], families: {}, workshops: [], vouchers: [], transactions: [] };
 
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
         getAnalytics(app);
 
-        // Real-time listener for Firestore data
         function initFirestoreListeners() {
-            // Listen to Families
             onSnapshot(collection(db, "families"), (snapshot) => {
                 window.appData.families = {};
                 snapshot.forEach((docSnap) => {
@@ -42,7 +37,6 @@
                 updateAdminUI();
             });
 
-            // Listen to Students
             onSnapshot(collection(db, "students"), (snapshot) => {
                 window.appData.students = [];
                 snapshot.forEach((docSnap) => {
@@ -51,7 +45,6 @@
                 updateAdminUI();
             });
 
-            // Listen to Workshops
             onSnapshot(collection(db, "workshops"), (snapshot) => {
                 window.appData.workshops = [];
                 snapshot.forEach((docSnap) => {
@@ -60,7 +53,6 @@
                 updateAdminUI();
             });
 
-            // Listen to Vouchers
             onSnapshot(collection(db, "vouchers"), (snapshot) => {
                 window.appData.vouchers = [];
                 snapshot.forEach((docSnap) => {
@@ -69,7 +61,6 @@
                 updateAdminUI();
             });
 
-            // Listen to Transactions
             onSnapshot(collection(db, "transactions"), (snapshot) => {
                 window.appData.transactions = [];
                 snapshot.forEach((docSnap) => {
@@ -81,7 +72,6 @@
 
         initFirestoreListeners();
 
-        // Admin actions attached to window
         window.handleAddNewStudent = async function(e) {
             e.preventDefault();
             const name = document.getElementById('new-student-name').value.trim();
@@ -91,32 +81,48 @@
             const wallet = parseFloat(document.getElementById('new-family-wallet').value) || 0;
 
             try {
-                // Add student doc
                 await addDoc(collection(db, "students"), { name, family: familyId, contact, dob: '2016-01-01' });
 
-                // Update or create family doc
                 const famRef = doc(db, "families", familyId);
                 await setDoc(famRef, {
                     wallet: wallet,
-                    stars: 50,
+                    stars: 100, // Automatic 100 stars upon signup
                     tier: tier
                 }, { merge: true });
 
-                // Add transaction log
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
                     student: name,
                     family: familyId,
                     desc: 'Admin registered student & added initial wallet credit',
                     amount: `+ RM ${wallet.toFixed(2)}`,
-                    starsChange: '+50 ⭐'
+                    starsChange: '+100 ⭐ (Welcome Bonus)'
                 });
 
-                alert(`Student "${name}" successfully saved to Firebase cloud!`);
+                alert(`Student "${name}" registered successfully with 100 welcome stars!`);
                 e.target.reset();
             } catch (err) {
                 console.error("Error adding student: ", err);
-                alert("Error saving to database. Check console.");
+                alert("Error saving to database.");
+            }
+        }
+
+        // Delete student function
+        window.deleteStudent = async function(studentId, studentName, familyId) {
+            if (!confirm(`Are you sure you want to remove student "${studentName}"?`)) return;
+            try {
+                await deleteDoc(doc(db, "students", studentId));
+                await addDoc(collection(db, "transactions"), {
+                    date: new Date().toISOString().split('T')[0],
+                    student: studentName,
+                    family: familyId,
+                    desc: `Admin removed student record`,
+                    amount: 'RM 0.00',
+                    starsChange: '0 ⭐'
+                });
+                alert(`Student "${studentName}" removed.`);
+            } catch (err) {
+                console.error("Error deleting student:", err);
             }
         }
 
@@ -131,7 +137,7 @@
                 await addDoc(collection(db, "workshops"), {
                     title, date, price, exclusive, registered: []
                 });
-                alert(`Workshop "${title}" published to cloud!`);
+                alert(`Workshop "${title}" published!`);
                 e.target.reset();
             } catch (err) {
                 console.error("Error creating workshop: ", err);
@@ -167,7 +173,7 @@
                     amount: `${amount >= 0 ? '+' : ''} RM ${amount.toFixed(2)}`,
                     starsChange: '0 ⭐'
                 });
-                alert('Wallet updated in cloud!');
+                alert('Wallet updated!');
             } catch (err) {
                 console.error("Error updating wallet:", err);
             }
@@ -177,15 +183,13 @@
 <body class="bg-slate-100 text-slate-800 font-sans p-4 sm:p-6">
 
     <div class="max-w-6xl mx-auto space-y-6">
-        <!-- Header -->
         <header class="bg-slate-900 text-white p-6 rounded-2xl shadow-lg flex justify-between items-center">
             <div>
-                <h1 class="text-2xl font-bold">🎹 Expressivo Club - Admin Portal (Live Firebase)</h1>
-                <p class="text-xs text-slate-400 mt-1">Cloud Database Synchronized Across All Devices</p>
+                <h1 class="text-2xl font-bold">🎹 Expressivo Club - Admin Portal</h1>
+                <p class="text-xs text-slate-400 mt-1">Live Cloud Management System</p>
             </div>
         </header>
 
-        <!-- Navigation Tabs -->
         <div class="flex bg-white p-2 rounded-xl shadow-sm border space-x-2 text-xs sm:text-sm font-semibold overflow-x-auto">
             <button onclick="switchAdminTab('students')" id="admin-tab-students" class="px-4 py-2 bg-slate-900 text-white rounded-lg whitespace-nowrap">🎓 Students & Families</button>
             <button onclick="switchAdminTab('workshops')" id="admin-tab-workshops" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">📅 Manage Workshops</button>
@@ -193,7 +197,7 @@
             <button onclick="switchAdminTab('transactions')" id="admin-tab-transactions" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">📜 Audit Log</button>
         </div>
 
-        <!-- TAB 1: STUDENTS & FAMILIES -->
+        <!-- TAB 1 -->
         <div id="admin-content-students" class="space-y-6">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4 h-fit">
@@ -224,7 +228,7 @@
                             <label class="block font-bold text-slate-600 mb-1">Initial Wallet Credit (RM)</label>
                             <input type="number" id="new-family-wallet" value="100.00" step="0.01" class="w-full p-2.5 border rounded-xl outline-none">
                         </div>
-                        <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition">Save to Cloud</button>
+                        <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition">Save to Cloud (+100 Stars)</button>
                     </form>
                 </div>
 
@@ -235,7 +239,7 @@
             </div>
         </div>
 
-        <!-- TAB 2: WORKSHOPS -->
+        <!-- TAB 2 -->
         <div id="admin-content-workshops" class="hidden space-y-6">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4 h-fit">
@@ -255,7 +259,7 @@
                         </div>
                         <div class="flex items-center gap-2 pt-1">
                             <input type="checkbox" id="ws-exclusive" class="w-4 h-4 text-indigo-600 rounded">
-                            <label for="ws-exclusive" class="font-bold text-slate-700">Exclusive (Crescendo/Virtuoso Tiers Only)</label>
+                            <label for="ws-exclusive" class="font-bold text-slate-700">Exclusive (Crescendo/Virtuoso Only)</label>
                         </div>
                         <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition">Publish Workshop</button>
                     </form>
@@ -268,7 +272,7 @@
             </div>
         </div>
 
-        <!-- TAB 3: VOUCHERS -->
+        <!-- TAB 3 -->
         <div id="admin-content-vouchers" class="hidden space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
                 <h2 class="text-base font-bold text-slate-800 border-b pb-3">🎁 Pending Voucher Claims</h2>
@@ -276,7 +280,7 @@
             </div>
         </div>
 
-        <!-- TAB 4: TRANSACTIONS -->
+        <!-- TAB 4 -->
         <div id="admin-content-transactions" class="hidden space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
                 <h2 class="text-base font-bold text-slate-800 border-b pb-3">📜 Complete System Audit Log</h2>
@@ -297,8 +301,6 @@
 
         function updateAdminUI() {
             const data = window.appData;
-
-            // 1. Students list
             const studentsContainer = document.getElementById('admin-students-list');
             const uniqueFamilies = [...new Set(data.students.map(s => s.family))];
 
@@ -319,13 +321,18 @@
                                 </div>
                                 <div class="flex gap-2">
                                     <button onclick="adjustWallet('${famKey}')" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition">Adjust Wallet</button>
-                                    <a href="${parentLink}" target="_blank" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition inline-block">Open Parent Portal ↗</a>
+                                    <a href="${parentLink}" target="_blank" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition inline-block">Open Portal ↗</a>
                                 </div>
                             </div>
                             <div class="space-y-1">
                                 <p class="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Registered Siblings:</p>
                                 <div class="flex flex-wrap gap-2">
-                                    ${famStudents.map(s => `<span class="px-2.5 py-1 bg-white border rounded-lg text-slate-700 font-medium">${s.name} (${s.contact})</span>`).join('')}
+                                    ${famStudents.map(s => `
+                                        <span class="px-2.5 py-1.5 bg-white border rounded-lg text-slate-700 font-medium flex items-center gap-2">
+                                            ${s.name} (${s.contact})
+                                            <button onclick="deleteStudent('${s.id}', '${s.name}', '${famKey}')" class="text-rose-500 hover:text-rose-700 font-bold ml-1">🗑️</button>
+                                        </span>
+                                    `).join('')}
                                 </div>
                             </div>
                         </div>
@@ -333,7 +340,6 @@
                 }).join('');
             }
 
-            // 2. Workshops
             const wsContainer = document.getElementById('admin-workshops-list');
             wsContainer.innerHTML = data.workshops.length === 0 ? `<p class="text-slate-400 italic">No workshops scheduled.</p>` :
                 data.workshops.map(w => `
@@ -346,7 +352,6 @@
                     </div>
                 `).join('');
 
-            // 3. Vouchers
             const vContainer = document.getElementById('admin-vouchers-list');
             const pendingVouchers = data.vouchers.filter(v => v.status === 'Pending Verification');
             vContainer.innerHTML = pendingVouchers.length === 0 ? `<p class="text-slate-400 italic">No pending voucher claims.</p>` :
@@ -360,7 +365,6 @@
                     </div>
                 `).join('');
 
-            // 4. Transactions Log
             const txContainer = document.getElementById('admin-transactions-list');
             txContainer.innerHTML = data.transactions.length === 0 ? `<p class="text-slate-400 italic">No transactions recorded.</p>` :
                 data.transactions.map(t => `
