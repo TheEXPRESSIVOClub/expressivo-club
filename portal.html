@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, doc, getDoc, updateDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, doc, updateDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHvyRDPEG9jzFbqSTuKmTjvnRDShmN6uU",
@@ -24,7 +24,10 @@
         window.db = db;
         window.portalData = { student: null, family: null, siblings: [], workshops: [], transactions: [] };
 
-        async function initPortal() {
+        function initPortal() {
+            // Render static components immediately so catalog is always visible
+            renderRewardsCatalog();
+
             const urlParams = new URLSearchParams(window.location.search);
             const studentParam = urlParams.get('student');
 
@@ -56,18 +59,22 @@
             onSnapshot(collection(db, "workshops"), (snapshot) => {
                 window.portalData.workshops = [];
                 snapshot.forEach(d => window.portalData.workshops.push({ id: d.id, ...d.data() }));
-                updatePortalUI();
+                renderWorkshops();
             });
 
             onSnapshot(collection(db, "transactions"), (snapshot) => {
                 window.portalData.transactions = [];
                 snapshot.forEach(d => window.portalData.transactions.push({ id: d.id, ...d.data() }));
-                updatePortalUI();
+                renderTransactions();
             });
         }
 
         window.claimVoucher = async function(title, cost) {
             const data = window.portalData;
+            if (!data.student || !data.family) {
+                alert("Please select a valid student account first.");
+                return;
+            }
             const currentStars = data.family?.stars ?? 100;
 
             if (currentStars < cost) {
@@ -104,6 +111,10 @@
 
         window.registerWorkshop = async function(wId) {
             const data = window.portalData;
+            if (!data.student) {
+                alert("Student details not loaded yet.");
+                return;
+            }
             const ws = data.workshops.find(w => w.id === wId);
             if (!ws) return;
 
@@ -135,7 +146,101 @@
             }
         };
 
-        initPortal();
+        function renderRewardsCatalog() {
+            const rewards = [
+                { title: "RM5 Off Workshop", cost: 100, desc: "Redeem 100 stars for RM5 off any workshop." },
+                { title: "RM10 Off Workshop", cost: 200, desc: "Redeem 200 stars for RM10 off any workshop." },
+                { title: "RM20 Off Workshop", cost: 400, desc: "Redeem 400 stars for RM20 off any workshop." },
+                { title: "50% Off Workshop", cost: 600, desc: "Redeem 600 stars for 50% off any workshop." },
+                { title: "FREE Workshop", cost: 1000, desc: "Redeem 1000 stars for a completely FREE workshop." }
+            ];
+
+            const rewardsContainer = document.getElementById('rewards-list');
+            if (rewardsContainer) {
+                rewardsContainer.innerHTML = rewards.map(r => `
+                    <div class="bg-slate-50 p-4 rounded-xl border flex flex-col justify-between gap-3">
+                        <div>
+                            <div class="flex justify-between items-start">
+                                <h4 class="font-bold text-slate-800 text-sm">${r.title}</h4>
+                                <span class="px-2.5 py-1 bg-amber-100 text-amber-800 font-extrabold text-xs rounded-lg">${r.cost} ⭐</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-1">${r.desc}</p>
+                        </div>
+                        <button onclick="claimVoucher('${r.title}', ${r.cost})" class="w-full py-2 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 transition">Redeem Reward</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function renderWorkshops() {
+            const data = window.portalData;
+            const container = document.getElementById('parent-workshops-list');
+            if (!container) return;
+
+            container.innerHTML = data.workshops.length === 0 ?
+                `<p class="text-slate-400 italic text-xs">No upcoming workshops scheduled.</p>` :
+                data.workshops.map(w => {
+                    const isReg = data.student && (w.registered || []).includes(data.student.name);
+                    return `
+                        <div class="bg-slate-50 p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+                            <div>
+                                <h4 class="font-bold text-slate-800 text-sm">${w.title} ${w.exclusive ? '<span class="text-amber-600 font-semibold">⭐ Exclusive</span>' : ''}</h4>
+                                <p class="text-slate-500 mt-0.5">📅 Date: ${w.date} | ⏰ Time: ${w.time || 'TBD'} | 👨‍‍🏫 Teacher: ${w.teacher || 'TBD'}</p>
+                                <p class="text-slate-600 font-semibold mt-0.5">Price: RM ${w.price}</p>
+                            </div>
+                            <div>
+                                ${isReg ? `<span class="px-3 py-1.5 bg-emerald-100 text-emerald-700 font-bold rounded-lg block text-center">Registered ✓</span>` :
+                                `<button onclick="registerWorkshop('${w.id}')" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition">Book Workshop</button>`}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+        }
+
+        function renderTransactions() {
+            const data = window.portalData;
+            const container = document.getElementById('parent-transaction-history');
+            if (!container) return;
+
+            const familyTx = data.student ? data.transactions.filter(t => t.family === data.student.family || t.student === data.student.name) : data.transactions;
+            
+            container.innerHTML = familyTx.length === 0 ?
+                `<p class="text-slate-400 italic">No transaction history yet.</p>` :
+                familyTx.map(t => `
+                    <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center text-xs">
+                        <div>
+                            <p class="font-bold text-slate-800">${t.desc} <span class="text-slate-500 font-normal">(${t.student})</span></p>
+                            <p class="text-slate-400 text-[10px]">${t.date}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold ${t.amount && t.amount.startsWith('-') ? 'text-rose-600' : 'text-emerald-600'}">${t.amount || 'RM 0.00'}</p>
+                            <p class="text-amber-600 text-[10px] font-bold">${t.starsChange || ''}</p>
+                        </div>
+                    </div>
+                `).join('');
+        }
+
+        function updatePortalUI() {
+            const data = window.portalData;
+            if (!data.student) return;
+
+            const fam = data.family || { wallet: 0, stars: 100, tier: 'Prelude' };
+
+            document.getElementById('header-student-title').innerText = `🎹 Family Portal`;
+            document.getElementById('header-student-subtitle').innerText = `Student: ${data.student.name} | Contact: ${data.student.contact}`;
+            document.getElementById('header-stars').innerText = `${fam.stars ?? 100} ⭐`;
+            document.getElementById('header-tier').innerText = `${fam.tier || 'Prelude'} Tier`;
+            document.getElementById('family-wallet-balance').innerText = `RM ${Number(fam.wallet || 0).toFixed(2)}`;
+
+            document.getElementById('family-siblings-list').innerHTML = data.siblings.map(s => `
+                <span class="px-3 py-1.5 border text-xs font-bold rounded-lg ${s.name === data.student.name ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700'}">${s.name} (${s.contact})</span>
+            `).join('');
+
+            renderTransactions();
+            renderWorkshops();
+        }
+
+        window.onload = initPortal;
     </script>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans p-4 sm:p-6">
@@ -198,7 +303,7 @@
         <!-- TAB 3: WORKSHOPS -->
         <div id="content-workshops" class="hidden space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                <h2 class="text-lg font-bold text-slate-800 border-b pb-3">Upcoming Workshops</h2>
+                <h2 class="text-lg font-bold text-slate-800 border-b pb-3">Upcoming Workshops & Masterclasses</h2>
                 <div id="parent-workshops-list" class="space-y-3"></div>
             </div>
         </div>
@@ -212,78 +317,6 @@
             });
             document.getElementById(`content-${tab}`).classList.remove('hidden');
             document.getElementById(`tab-${tab}`).className = "px-4 py-2 bg-slate-900 text-white rounded-lg whitespace-nowrap";
-        }
-
-        function updatePortalUI() {
-            const data = window.portalData;
-            if (!data.student) return;
-
-            const fam = data.family || { wallet: 0, stars: 100, tier: 'Prelude' };
-
-            document.getElementById('header-student-title').innerText = `🎹 Family Portal`;
-            document.getElementById('header-student-subtitle').innerText = `Viewing Student: ${data.student.name} (Contact: ${data.student.contact})`;
-            document.getElementById('header-stars').innerText = `${fam.stars ?? 100} ⭐`;
-            document.getElementById('header-tier').innerText = `${fam.tier || 'Prelude'} Tier`;
-            document.getElementById('family-wallet-balance').innerText = `RM ${Number(fam.wallet || 0).toFixed(2)}`;
-
-            document.getElementById('family-siblings-list').innerHTML = data.siblings.map(s => `
-                <span class="px-3 py-1.5 border text-xs font-bold rounded-lg ${s.name === data.student.name ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700'}">${s.name} (${s.contact})</span>
-            `).join('');
-
-            const familyTx = data.transactions.filter(t => t.family === data.student.family || t.student === data.student.name);
-            document.getElementById('parent-transaction-history').innerHTML = familyTx.length === 0 ?
-                `<p class="text-slate-400 italic">No transaction history yet.</p>` :
-                familyTx.map(t => `
-                    <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center text-xs">
-                        <div>
-                            <p class="font-bold text-slate-800">${t.desc} <span class="text-slate-500 font-normal">(${t.student})</span></p>
-                            <p class="text-slate-400 text-[10px]">${t.date}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="font-bold ${t.amount && t.amount.startsWith('-') ? 'text-rose-600' : 'text-emerald-600'}">${t.amount || 'RM 0.00'}</p>
-                            <p class="text-amber-600 text-[10px] font-bold">${t.starsChange || ''}</p>
-                        </div>
-                    </div>
-                `).join('');
-
-            const rewards = [
-                { title: "RM5 Off Workshop", cost: 100, desc: "Redeem 100 stars for RM5 off any workshop." },
-                { title: "RM10 Off Workshop", cost: 200, desc: "Redeem 200 stars for RM10 off any workshop." },
-                { title: "RM20 Off Workshop", cost: 400, desc: "Redeem 400 stars for RM20 off any workshop." },
-                { title: "50% Off Workshop", cost: 600, desc: "Redeem 600 stars for 50% off any workshop." },
-                { title: "FREE Workshop", cost: 1000, desc: "Redeem 1000 stars for a completely FREE workshop." }
-            ];
-
-            document.getElementById('rewards-list').innerHTML = rewards.map(r => `
-                <div class="bg-slate-50 p-4 rounded-xl border flex flex-col justify-between gap-3">
-                    <div>
-                        <div class="flex justify-between items-start">
-                            <h4 class="font-bold text-slate-800 text-sm">${r.title}</h4>
-                            <span class="px-2.5 py-1 bg-amber-100 text-amber-800 font-extrabold text-xs rounded-lg">${r.cost} ⭐</span>
-                        </div>
-                        <p class="text-xs text-slate-500 mt-1">${r.desc}</p>
-                    </div>
-                    <button onclick="claimVoucher('${r.title}', ${r.cost})" class="w-full py-2 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 transition">Redeem Reward</button>
-                </div>
-            `).join('');
-
-            document.getElementById('parent-workshops-list').innerHTML = data.workshops.length === 0 ?
-                `<p class="text-slate-400 italic text-xs">No upcoming workshops scheduled.</p>` :
-                data.workshops.map(w => {
-                    const isReg = (w.registered || []).includes(data.student.name);
-                    return `
-                        <div class="bg-slate-50 p-4 rounded-xl border flex justify-between items-center text-xs">
-                            <div>
-                                <h4 class="font-bold text-slate-800">${w.title}</h4>
-                                <p class="text-slate-500">Date: ${w.date} | Price: RM ${w.price}</p>
-                            </div>
-                            <div>
-                                ${isReg ? `<span class="px-3 py-1 bg-emerald-100 text-emerald-700 font-bold rounded-lg">Registered ✓</span>` :
-                                `<button onclick="registerWorkshop('${w.id}')" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition">Book Workshop</button>`}
-                            </div>
-                        </div>
-                    `;
-                }).join('');
         }
     </script>
 </body>
