@@ -21,7 +21,7 @@
             <button onclick="switchAdminTab('pos')" id="atab-pos" class="px-4 py-2 bg-indigo-600 text-white rounded-lg transition whitespace-nowrap">1. POS & Invoices</button>
             <button onclick="switchAdminTab('vouchers')" id="atab-vouchers" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg transition whitespace-nowrap">2. Voucher Scanning</button>
             <button onclick="switchAdminTab('bonuses')" id="atab-bonuses" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg transition whitespace-nowrap">3. Star Bonuses</button>
-            <button onclick="switchAdminTab('students')" id="atab-students" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg transition whitespace-nowrap">4. Student & Sibling Directory</button>
+            <button onclick="switchAdminTab('students')" id="atab-students" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg transition whitespace-nowrap">4. Student Directory</button>
             <button onclick="switchAdminTab('workshops')" id="atab-workshops" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg transition whitespace-nowrap">5. Workshops</button>
             <button onclick="switchAdminTab('audit')" id="atab-audit" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg transition whitespace-nowrap">6. Audit Trail</button>
         </div>
@@ -32,7 +32,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-slate-600 mb-1">Select Student / Family Member</label>
+                        <label class="block text-sm font-medium text-slate-600 mb-1">Select Student</label>
                         <select id="pos-student" class="w-full px-3 py-2 border rounded-xl text-sm font-semibold text-indigo-700 bg-indigo-50">
                         </select>
                     </div>
@@ -43,7 +43,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-600 mb-1">Apply Family Reward Voucher</label>
+                        <label class="block text-sm font-medium text-slate-600 mb-1">Apply Reward Voucher</label>
                         <select id="pos-voucher" onchange="updatePOSCalculation()" class="w-full px-3 py-2 border rounded-xl text-sm">
                             <option value="0|None">No Voucher Applied</option>
                         </select>
@@ -58,7 +58,7 @@
                             <div class="flex justify-between text-rose-600"><span>Voucher Discount:</span> <span id="breakdown-discount">-RM 0.00</span></div>
                             <hr class="my-2">
                             <div class="flex justify-between font-bold text-slate-800 text-base"><span>Net Amount Paid:</span> <span id="breakdown-net">RM 0.00</span></div>
-                            <div class="flex justify-between font-bold text-indigo-600 text-sm mt-1"><span>Family Stars Earned (RM2 = 1):</span> <span id="breakdown-stars">0 Stars</span></div>
+                            <div class="flex justify-between font-bold text-indigo-600 text-sm mt-1"><span>Stars Earned (RM2 = 1):</span> <span id="breakdown-stars">0 Stars</span></div>
                         </div>
                     </div>
                     <button onclick="completePOSCheckout()" class="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition text-sm shadow-sm">
@@ -78,13 +78,13 @@
 
         <!-- ADMIN TAB 2: Voucher Scanning & Approval -->
         <div id="admin-content-vouchers" class="hidden bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-            <h3 class="text-lg font-bold text-slate-800">🔍 Scan & Approve Family Claimed Vouchers</h3>
+            <h3 class="text-lg font-bold text-slate-800">🔍 Scan & Approve Claimed Vouchers</h3>
             <div id="admin-vouchers-list" class="space-y-3"></div>
         </div>
 
         <!-- ADMIN TAB 3: Star Bonuses -->
         <div id="admin-content-bonuses" class="hidden bg-white p-6 rounded-2xl shadow-sm border max-w-lg mx-auto space-y-4">
-            <h3 class="text-lg font-bold text-slate-800">⭐ Issue Star Bonuses & Configure Referral Settings</h3>
+            <h3 class="text-lg font-bold text-slate-800">⭐ Issue Star Bonuses & Configure Referrals</h3>
             <div class="space-y-4 text-sm">
                 <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100 space-y-2">
                     <label class="block font-bold text-indigo-900 text-xs">Configure Referral Bonus Star Value</label>
@@ -113,23 +113,24 @@
             </div>
         </div>
 
-        <!-- ADMIN TAB 4: Student & Sibling Directory -->
+        <!-- ADMIN TAB 4: Student Directory -->
         <div id="admin-content-students" class="hidden bg-white p-6 rounded-2xl shadow-sm border space-y-6">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h3 class="text-lg font-bold text-slate-800">👤 Student & Sibling Family Directory</h3>
+                <h3 class="text-lg font-bold text-slate-800">👤 Student Directory</h3>
                 <div class="w-full sm:w-72">
-                    <input type="text" id="student-search-input" oninput="filterStudents()" placeholder="🔍 Search student or family..." class="w-full px-3 py-2 border rounded-xl text-sm">
+                    <input type="text" id="student-search-input" oninput="filterStudents()" placeholder="🔍 Search student..." class="w-full px-3 py-2 border rounded-xl text-sm">
                 </div>
             </div>
 
             <div class="bg-slate-50 p-4 rounded-xl border space-y-3 text-sm">
-                <h4 class="font-bold text-slate-700">+ Register New Student (Link Sibling to Family)</h4>
+                <h4 class="font-bold text-slate-700">+ Register New Student</h4>
+                <p class="text-xs text-slate-500">Leave sibling box blank if standalone. If they are a sibling, type an existing student's name to link their accounts.</p>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <input type="text" id="new-student-name" placeholder="Student Name" class="px-3 py-2 border rounded-lg bg-white">
-                    <input type="text" id="new-family-name" placeholder="Family Account (e.g. Tan Family)" class="px-3 py-2 border rounded-lg bg-white">
+                    <input type="text" id="new-sibling-name" placeholder="Link to Sibling (Optional)" class="px-3 py-2 border rounded-lg bg-white">
                     <input type="number" id="new-student-deposit" value="250" placeholder="Initial Deposit (RM)" class="px-3 py-2 border rounded-lg bg-white">
                 </div>
-                <button onclick="addNewStudent()" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg text-xs">Register Student & Link Family Pool</button>
+                <button onclick="addNewStudent()" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg text-xs">Register Student</button>
             </div>
 
             <div id="admin-students-list" class="space-y-3"></div>
@@ -169,19 +170,19 @@
 
     <script>
         function getData() {
-            let data = JSON.parse(localStorage.getItem('expressivo_data_v8'));
+            let data = JSON.parse(localStorage.getItem('expressivo_data_v9'));
             if (!data) {
                 data = { 
                     currentStudent: 'Alex Tan',
                     referralBonusStars: 20,
                     students: [
-                        { name: 'Alex Tan', family: 'Tan Family', wallet: 250.00, tier: 'Prelude' },
-                        { name: 'Emma Tan', family: 'Tan Family', wallet: 300.00, tier: 'Prelude' },
-                        { name: 'Lucas Lee', family: 'Lee Family', wallet: 850.00, tier: 'Crescendo' }
+                        { name: 'Alex Tan', family: 'family_1', wallet: 250.00, tier: 'Prelude' },
+                        { name: 'Emma Tan', family: 'family_1', wallet: 300.00, tier: 'Prelude' },
+                        { name: 'Lucas Lee', family: 'family_2', wallet: 850.00, tier: 'Crescendo' }
                     ],
                     familyWallets: {
-                        'Tan Family': { wallet: 550.00, stars: 150, tier: 'Ensemble' },
-                        'Lee Family': { wallet: 850.00, stars: 420, tier: 'Crescendo' }
+                        'family_1': { wallet: 550.00, stars: 150, tier: 'Ensemble' },
+                        'family_2': { wallet: 850.00, stars: 420, tier: 'Crescendo' }
                     },
                     claimedVouchers: [], 
                     bookings: [],
@@ -189,14 +190,14 @@
                         { id: 101, title: "Masterclass Piano Technique", price: 88, exclusive: false, date: "Oct 15, 2026", registered: ['Alex Tan'] },
                         { id: 102, title: "Advanced Violin Masterclass", price: 150, exclusive: true, date: "Oct 22, 2026", registered: ['Emma Tan'] }
                     ],
-                    ledger: [{ date: 'Today', desc: 'Family System Initialized', change: '+150 Stars', user: 'Tan Family' }] 
+                    ledger: [{ date: 'Today', desc: 'System Initialized', change: '+150 Stars', user: 'Alex Tan' }] 
                 };
             }
             return data;
         }
 
         function saveData(data) {
-            localStorage.setItem('expressivo_data_v8', JSON.stringify(data));
+            localStorage.setItem('expressivo_data_v9', JSON.stringify(data));
             updateUI();
         }
 
@@ -290,7 +291,7 @@
                 date: new Date().toLocaleDateString(),
                 desc: `POS Checkout (${document.getElementById('pos-item').selectedOptions[0].text})`,
                 change: `+${earnedStars} Stars`,
-                user: `${studentName} (${studentObj.family})`
+                user: studentName
             });
 
             saveData(data);
@@ -298,11 +299,11 @@
             document.getElementById('invoice-box').classList.remove('hidden');
             document.getElementById('inv-date').innerText = new Date().toLocaleDateString();
             document.getElementById('invoice-details').innerHTML = `
-                <p><b>Student:</b> ${studentName} (${studentObj.family})</p>
+                <p><b>Student:</b> ${studentName}</p>
                 <p><b>Item:</b> ${document.getElementById('pos-item').selectedOptions[0].text}</p>
                 <p><b>Applied Voucher:</b> ${voucherTitle || 'None'}</p>
                 <p><b>Total Paid:</b> RM ${net.toFixed(2)}</p>
-                <p class="text-indigo-600 font-bold"><b>Family Stars Awarded:</b> +${earnedStars} Stars</p>
+                <p class="text-indigo-600 font-bold"><b>Stars Awarded:</b> +${earnedStars} Stars</p>
             `;
             alert('Payment successfully processed and invoice generated!');
         }
@@ -319,7 +320,7 @@
                     date: new Date().toLocaleDateString(),
                     desc: `Redeemed Voucher: ${voucher.title}`,
                     change: `-${voucher.cost} Stars`,
-                    user: voucher.family
+                    user: voucher.claimedBy
                 });
                 saveData(data);
                 alert('Voucher validated and approved!');
@@ -347,12 +348,12 @@
                 date: new Date().toLocaleDateString(),
                 desc: `Bonus: ${type} (Ref: ${remark})`,
                 change: `+${stars} Stars`,
-                user: `${studentObj.family} (${studentName})`
+                user: studentName
             });
 
             saveData(data);
             document.getElementById('bonus-remark').value = '';
-            alert(`Successfully issued ${stars} bonus stars to ${studentObj.family}!`);
+            alert(`Successfully issued ${stars} bonus stars to ${studentName}!`);
         }
 
         function openNewWorkshopModal() {
@@ -379,7 +380,7 @@
 
         function addNewStudent() {
             const name = document.getElementById('new-student-name').value.trim();
-            const family = document.getElementById('new-family-name').value.trim() || `${name} Family`;
+            const siblingInput = document.getElementById('new-sibling-name').value.trim();
             const deposit = parseFloat(document.getElementById('new-student-deposit').value) || 250;
             
             if (!name) {
@@ -393,25 +394,34 @@
                 return;
             }
 
-            data.students.push({ name, family, wallet: deposit, tier: getMembershipTier(deposit) });
-            
-            if (!data.familyWallets[family]) {
-                data.familyWallets[family] = { wallet: deposit, stars: 100, tier: getMembershipTier(deposit) };
+            let assignedFamilyKey = '';
+
+            if (siblingInput) {
+                const siblingObj = data.students.find(s => s.name.toLowerCase() === siblingInput.toLowerCase());
+                if (!siblingObj) {
+                    alert(`Could not find sibling "${siblingInput}". Please check the name or leave blank.`);
+                    return;
+                }
+                assignedFamilyKey = siblingObj.family;
+                data.familyWallets[assignedFamilyKey].wallet += deposit;
+                data.familyWallets[assignedFamilyKey].tier = getMembershipTier(data.familyWallets[assignedFamilyKey].wallet);
+            } else {
+                assignedFamilyKey = 'fam_' + Date.now();
+                data.familyWallets[assignedFamilyKey] = { wallet: deposit, stars: 100, tier: getMembershipTier(deposit) };
                 data.ledger.unshift({
                     date: new Date().toLocaleDateString(),
-                    desc: `New Family Registration (${family}) + Welcome Gift`,
+                    desc: `New Registration (${name}) + Welcome Gift`,
                     change: `+100 Stars`,
-                    user: family
+                    user: name
                 });
-            } else {
-                data.familyWallets[family].wallet += deposit;
-                data.familyWallets[family].tier = getMembershipTier(data.familyWallets[family].wallet);
             }
+
+            data.students.push({ name, family: assignedFamilyKey, wallet: deposit, tier: getMembershipTier(deposit) });
 
             saveData(data);
             document.getElementById('new-student-name').value = '';
-            document.getElementById('new-family-name').value = '';
-            alert(`Student ${name} successfully registered and linked to ${family}!`);
+            document.getElementById('new-sibling-name').value = '';
+            alert(`Student ${name} successfully registered!`);
         }
 
         function deleteStudent(name) {
@@ -420,19 +430,19 @@
             if (!studentObj) return;
 
             if (confirm(`Are you sure you want to remove ${name}?`)) {
-                const familyName = studentObj.family;
+                const familyKey = studentObj.family;
                 data.students = data.students.filter(s => s.name !== name);
                 data.workshops.forEach(w => {
                     w.registered = w.registered.filter(r => r !== name);
                 });
-                if (data.students.filter(s => s.family === familyName).length === 0) {
-                    delete data.familyWallets[familyName];
+                if (data.students.filter(s => s.family === familyKey).length === 0) {
+                    delete data.familyWallets[familyKey];
                 }
                 data.ledger.unshift({
                     date: new Date().toLocaleDateString(),
                     desc: `Removed Student: ${name}`,
                     change: `System`,
-                    user: familyName
+                    user: name
                 });
                 saveData(data);
                 alert(`Student ${name} successfully deleted.`);
@@ -449,8 +459,8 @@
             const currentStudentObj = data.students.find(s => s.name === studentName) || data.students[0];
             const currentFamily = currentStudentObj ? currentStudentObj.family : '';
 
-            document.getElementById('pos-student').innerHTML = data.students.map(s => `<option value="${s.name}" ${s.name === studentName ? 'selected' : ''}>${s.name} (${s.family})</option>`).join('');
-            document.getElementById('bonus-student').innerHTML = data.students.map(s => `<option value="${s.name}">${s.name} (${s.family})</option>`).join('');
+            document.getElementById('pos-student').innerHTML = data.students.map(s => `<option value="${s.name}" ${s.name === studentName ? 'selected' : ''}>${s.name}</option>`).join('');
+            document.getElementById('bonus-student').innerHTML = data.students.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
             document.getElementById('config-referral-stars').value = data.referralBonusStars;
 
             document.getElementById('pos-item').innerHTML = `<option value="0|0">-- Select Workshop / Course --</option>` +
@@ -466,25 +476,26 @@
                 data.claimedVouchers.filter(v => v.status === 'Pending Verification').map(v => `
                     <div class="bg-white p-4 rounded-xl border border-amber-200 flex justify-between items-center text-sm">
                         <div>
-                            <h4 class="font-bold text-slate-700">${v.title} <span class="text-xs text-indigo-600 font-semibold">(${v.family})</span></h4>
-                            <p class="text-xs text-slate-400">Cost: ${v.cost} Stars | Claimed by: ${v.claimedBy}</p>
+                            <h4 class="font-bold text-slate-700">${v.title} <span class="text-xs text-indigo-600 font-semibold">(${v.claimedBy})</span></h4>
+                            <p class="text-xs text-slate-400">Cost: ${v.cost} Stars</p>
                         </div>
                         <button onclick="adminApproveVoucher(${v.id})" class="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg">Approve & Scan</button>
                     </div>
                 `).join('');
 
             const searchVal = (document.getElementById('student-search-input')?.value || '').toLowerCase();
-            const filteredStudents = data.students.filter(s => s.name.toLowerCase().includes(searchVal) || s.family.toLowerCase().includes(searchVal));
+            const filteredStudents = data.students.filter(s => s.name.toLowerCase().includes(searchVal));
             
             document.getElementById('admin-students-list').innerHTML = filteredStudents.length === 0 ?
                 `<p class="text-sm text-slate-400 italic">No students found.</p>` :
                 filteredStudents.map(s => {
                     const fam = data.familyWallets[s.family] || { tier: 'Prelude', stars: 0, wallet: 0 };
+                    const siblings = data.students.filter(st => st.family === s.family && st.name !== s.name).map(st => st.name);
                     return `
                         <div class="bg-white p-4 rounded-xl border flex justify-between items-center text-sm gap-2">
                             <div>
-                                <h4 class="font-bold text-slate-800">${s.name} <span class="text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded ml-2 font-normal">${s.family}</span></h4>
-                                <p class="text-xs text-slate-500 mt-0.5">Family Tier: <span class="font-semibold text-indigo-600">${fam.tier}</span> | Shared Stars: <span class="font-semibold text-indigo-600">${fam.stars}</span> | Family Wallet: RM${fam.wallet.toFixed(2)}</p>
+                                <h4 class="font-bold text-slate-800">${s.name} ${siblings.length > 0 ? `<span class="text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded ml-2 font-normal">Sibling of: ${siblings.join(', ')}</span>` : ''}</h4>
+                                <p class="text-xs text-slate-500 mt-0.5">Tier: <span class="font-semibold text-indigo-600">${fam.tier}</span> | Stars: <span class="font-semibold text-indigo-600">${fam.stars}</span> | Wallet: RM${fam.wallet.toFixed(2)}</p>
                             </div>
                             <button onclick="deleteStudent('${s.name}')" class="px-3 py-1.5 bg-rose-50 text-rose-600 font-semibold text-xs rounded-lg hover:bg-rose-100 whitespace-nowrap">Delete</button>
                         </div>
