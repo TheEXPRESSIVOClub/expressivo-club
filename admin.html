@@ -77,7 +77,7 @@
             <!-- Student Registration Form -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
                 <h2 class="text-lg font-bold text-slate-800 border-b pb-3">Register New Student</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1">Full Student Name</label>
                         <input type="text" id="reg-student-name" placeholder="e.g., Jenna Lim" class="w-full border p-2.5 rounded-xl text-sm">
@@ -91,13 +91,26 @@
                         <input type="date" id="reg-dob" class="w-full border p-2.5 rounded-xl text-sm">
                     </div>
                     <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Membership Tier</label>
+                        <select id="reg-tier" class="w-full border p-2.5 rounded-xl text-sm font-semibold">
+                            <option value="Prelude">Prelude Tier</option>
+                            <option value="Ensemble">Ensemble Tier</option>
+                            <option value="Crescendo">Crescendo Tier</option>
+                            <option value="Virtuoso">Virtuoso Tier</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1">Referred By (Optional)</label>
                         <select id="reg-referred-by" class="w-full border p-2.5 rounded-xl text-sm font-semibold">
                             <option value="none">-- Direct Walk-in / No Referral --</option>
                         </select>
                     </div>
+                    <div class="flex items-end">
+                        <button onclick="registerNewStudent()" class="w-full py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition text-sm">Register Student & Save Profile</button>
+                    </div>
                 </div>
-                <button onclick="registerNewStudent()" class="px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition text-sm">Register Student & Save Profile</button>
             </div>
 
             <!-- Workshop Management Section -->
@@ -106,7 +119,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1">Workshop Title</label>
-                        <input type="text" id=" workshop-title" placeholder="e.g., Jazz Piano Intro" class="w-full border p-2 rounded-xl text-sm">
+                        <input type="text" id="workshop-title-input" placeholder="e.g., Jazz Piano Intro" class="w-full border p-2 rounded-xl text-sm">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1">Price (RM)</label>
@@ -213,9 +226,9 @@
                 data = { 
                     referralBonusStars: 20,
                     students: [
-                        { name: 'Alex Tan', family: 'family_1', contact: '+6012-8889999', dob: '2015-05-12', wallet: 250.00, tier: 'Prelude' },
-                        { name: 'Emma Tan', family: 'family_1', contact: '+6012-8889999', dob: '2017-08-20', wallet: 300.00, tier: 'Prelude' },
-                        { name: 'Lucas Lee', family: 'family_2', contact: '+6017-3334444', dob: '2014-01-05', wallet: 850.00, tier: 'Crescendo' }
+                        { name: 'Alex Tan', family: 'family_1', contact: '+6012-8889999', dob: '2015-05-12', wallet: 250.00 },
+                        { name: 'Emma Tan', family: 'family_1', contact: '+6012-8889999', dob: '2017-08-20', wallet: 300.00 },
+                        { name: 'Lucas Lee', family: 'family_2', contact: '+6017-3334444', dob: '2014-01-05', wallet: 850.00 }
                     ],
                     familyWallets: {
                         'family_1': { wallet: 550.00, stars: 150, tier: 'Ensemble' },
@@ -227,8 +240,7 @@
                         { id: 102, title: "Advanced Violin Masterclass", price: 150, exclusive: true, date: "Oct 22, 2026", registered: ['Emma Tan'] }
                     ],
                     transactions: [
-                        { date: '2026-09-28', student: 'Alex Tan', family: 'family_1', desc: 'Registered for Piano Technique Workshop', amount: '- RM 88.00', starsChange: '+20 ⭐' },
-                        { date: '2026-09-25', student: 'Alex Tan', family: 'family_1', desc: 'Claimed RM20 Off Voucher', amount: '0.00', starsChange: '-400 ⭐' }
+                        { date: '2026-09-28', student: 'Alex Tan', family: 'family_1', desc: 'Registered for Piano Technique Workshop', amount: '- RM 88.00', starsChange: '+20 ⭐' }
                     ]
                 };
             }
@@ -239,7 +251,12 @@
             localStorage.setItem('expressivo_data_v9', JSON.stringify(data));
             updateAdminUI();
             if (currentSelectedStudent) {
-                viewStudentDetail(currentSelectedStudent);
+                const stillExists = data.students.some(s => s.name === currentSelectedStudent);
+                if (stillExists) {
+                    viewStudentDetail(currentSelectedStudent);
+                } else {
+                    closeDetailCard();
+                }
             }
         }
 
@@ -323,10 +340,11 @@
             const nameInput = document.getElementById('reg-student-name').value.trim();
             const contactInput = document.getElementById('reg-contact').value.trim();
             const dobInput = document.getElementById('reg-dob').value;
+            const selectedTier = document.getElementById('reg-tier').value;
             const referrer = document.getElementById('reg-referred-by').value;
 
             if (!nameInput) {
-                alert('Please enter student name');
+                alert('Please enter student name.');
                 return;
             }
 
@@ -338,17 +356,16 @@
                 contact: contactInput || 'Not Provided',
                 dob: dobInput || 'Not Provided',
                 family: newFamKey,
-                wallet: 0,
-                tier: 'Prelude'
+                wallet: 0
             });
 
-            data.familyWallets[newFamKey] = { wallet: 0, stars: 0, tier: 'Prelude' };
+            data.familyWallets[newFamKey] = { wallet: 0, stars: 0, tier: selectedTier };
 
             data.transactions.unshift({
                 date: new Date().toISOString().split('T')[0],
                 student: nameInput,
                 family: newFamKey,
-                desc: 'Student Profile Created',
+                desc: `Student Profile Created (${selectedTier} Tier)`,
                 amount: 'RM 0.00',
                 starsChange: '+0 ⭐'
             });
@@ -357,15 +374,17 @@
                 const refStudent = data.students.find(s => s.name === referrer);
                 if (refStudent && data.familyWallets[refStudent.family]) {
                     data.familyWallets[refStudent.family].stars += data.referralBonusStars || 20;
-                    alert(`Student registered! Referrer (${referrer}) awarded +${data.referralBonusStars || 20} Stars!`);
+                    alert(`Student registered under ${selectedTier} Tier! Referrer (${referrer}) awarded +${data.referralBonusStars || 20} Stars!`);
                 }
             } else {
-                alert('New student registered successfully!');
+                alert(`New student registered successfully under ${selectedTier} Tier!`);
             }
 
             document.getElementById('reg-student-name').value = '';
             document.getElementById('reg-contact').value = '';
             document.getElementById('reg-dob').value = '';
+            document.getElementById('reg-tier').value = 'Prelude';
+            document.getElementById('reg-referred-by').value = 'none';
             saveData(data);
         }
 
@@ -378,10 +397,16 @@
             // Remove from students list
             data.students = data.students.filter(s => s.name !== studentName);
 
-            // Also remove from any workshop registrations
+            // Remove from workshop registrations
             data.workshops.forEach(w => {
                 w.registered = w.registered.filter(name => name !== studentName);
             });
+
+            // If no other siblings share this family key, remove the family wallet entry too
+            const remainingSiblings = data.students.filter(s => s.family === student.family);
+            if (remainingSiblings.length === 0) {
+                delete data.familyWallets[student.family];
+            }
 
             // Log transaction audit
             data.transactions.unshift({
@@ -393,7 +418,6 @@
                 starsChange: '0 ⭐'
             });
 
-            closeDetailCard();
             saveData(data);
             alert(`Student ${studentName} has been successfully removed.`);
         }
@@ -433,7 +457,7 @@
         }
 
         function createNewWorkshop() {
-            const title = document.getElementById(' workshop-title').value.trim() || document.getElementById('workshop-title')?.value.trim();
+            const title = document.getElementById('workshop-title-input').value.trim();
             const price = parseFloat(document.getElementById('workshop-price').value);
             const date = document.getElementById('workshop-date').value.trim();
             const exclusive = document.getElementById('workshop-exclusive').checked;
@@ -456,7 +480,7 @@
             saveData(data);
             alert(`Workshop "${title}" published successfully!`);
             
-            document.getElementById(' workshop-title').value = '';
+            document.getElementById('workshop-title-input').value = '';
             document.getElementById('workshop-price').value = '';
             document.getElementById('workshop-date').value = '';
             document.getElementById('workshop-exclusive').checked = false;
