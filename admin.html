@@ -19,10 +19,10 @@
         </header>
 
         <!-- Navigation Tabs -->
-        <div class="flex bg-white p-2 rounded-xl shadow-sm border space-x-2 text-xs sm:text-sm font-semibold">
-            <button onclick="switchTab('pos')" id="tab-pos" class="px-4 py-2 bg-slate-900 text-white rounded-lg">🛒 Counter Checkout & Invoicing</button>
-            <button onclick="switchTab('vouchers')" id="tab-vouchers" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg">🎟️ Voucher Approvals</button>
-            <button onclick="switchTab('referrals')" id="tab-referrals" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg">👥 Student Registration & Referrals</button>
+        <div class="flex bg-white p-2 rounded-xl shadow-sm border space-x-2 text-xs sm:text-sm font-semibold overflow-x-auto">
+            <button onclick="switchTab('pos')" id="tab-pos" class="px-4 py-2 bg-slate-900 text-white rounded-lg whitespace-nowrap">🛒 Counter Checkout</button>
+            <button onclick="switchTab('vouchers')" id="tab-vouchers" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">🎟️ Voucher Approvals</button>
+            <button onclick="switchTab('students')" id="tab-students" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">👥 Students & Workshops</button>
         </div>
 
         <!-- TAB 1: POS & Invoicing -->
@@ -72,25 +72,116 @@
             <div id="admin-vouchers-list" class="space-y-3"></div>
         </div>
 
-        <!-- TAB 3: Registration & Referrals -->
-        <div id="content-referrals" class="hidden bg-white p-6 rounded-2xl shadow-sm border space-y-6">
-            <h2 class="text-lg font-bold text-slate-800 border-b pb-3">Register New Student</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1">New Student Name</label>
-                    <input type="text" id="reg-student-name" placeholder="e.g., Jenna Lim" class="w-full border p-2.5 rounded-xl text-sm">
+        <!-- TAB 3: Students, Profiles & Workshops -->
+        <div id="content-students" class="hidden space-y-6">
+            <!-- Student Registration Form -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+                <h2 class="text-lg font-bold text-slate-800 border-b pb-3">Register New Student</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Full Student Name</label>
+                        <input type="text" id="reg-student-name" placeholder="e.g., Jenna Lim" class="w-full border p-2.5 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Contact Number (Parent)</label>
+                        <input type="text" id="reg-contact" placeholder="e.g., +6012-3456789" class="w-full border p-2.5 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Date of Birth</label>
+                        <input type="date" id="reg-dob" class="w-full border p-2.5 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Referred By (Optional)</label>
+                        <select id="reg-referred-by" class="w-full border p-2.5 rounded-xl text-sm font-semibold">
+                            <option value="none">-- Direct Walk-in / No Referral --</option>
+                        </select>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1">Referred By (Optional)</label>
-                    <select id="reg-referred-by" class="w-full border p-2.5 rounded-xl text-sm font-semibold">
-                        <option value="none">-- Direct Walk-in / No Referral --</option>
-                    </select>
+                <button onclick="registerNewStudent()" class="px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition text-sm">Register Student & Save Profile</button>
+            </div>
+
+            <!-- Workshop Management Section -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+                <h3 class="text-lg font-bold text-slate-800 border-b pb-3">📅 Manage Upcoming Workshops & Attendance</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Workshop Title</label>
+                        <input type="text" id=" workshop-title" placeholder="e.g., Jazz Piano Intro" class="w-full border p-2 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Price (RM)</label>
+                        <input type="number" id="workshop-price" placeholder="88" class="w-full border p-2 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Date</label>
+                        <input type="text" id="workshop-date" placeholder="e.g., Nov 10, 2026" class="w-full border p-2 rounded-xl text-sm">
+                    </div>
+                    <div class="flex items-end">
+                        <label class="flex items-center space-x-2 text-xs font-semibold text-slate-600 pb-2.5 cursor-pointer">
+                            <input type="checkbox" id="workshop-exclusive" class="w-4 h-4 text-indigo-600 rounded">
+                            <span>Crescendo/Virtuoso Exclusive</span>
+                        </label>
+                    </div>
+                </div>
+                <button onclick="createNewWorkshop()" class="px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition text-sm">Publish New Workshop</button>
+
+                <div class="pt-3 border-t">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Currently Published Workshops & Attendance</h4>
+                    <div id="admin-workshops-list" class="space-y-3"></div>
                 </div>
             </div>
-            <button onclick="registerNewStudent()" class="px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition text-sm">Register Student & Reward Referrer</button>
 
-            <h3 class="text-md font-bold text-slate-800 pt-4 border-t">All Registered Students & Unique Parent Links</h3>
-            <div id="admin-students-list" class="space-y-2"></div>
+            <!-- Attendance Modal / Card -->
+            <div id="workshop-attendance-card" class="hidden bg-slate-900 text-white p-6 rounded-2xl shadow-lg space-y-4">
+                <div class="flex justify-between items-start border-b border-slate-700 pb-3">
+                    <div>
+                        <h3 class="text-lg font-bold" id="attendance-workshop-title">Workshop Attendance List</h3>
+                        <p class="text-xs text-slate-400" id="attendance-workshop-date"></p>
+                    </div>
+                    <button onclick="closeAttendanceCard()" class="text-xs bg-slate-800 px-3 py-1 rounded-lg hover:bg-slate-700">Close ✕</button>
+                </div>
+                <div id="attendance-student-list" class="space-y-2 max-h-48 overflow-y-auto text-xs"></div>
+            </div>
+
+            <!-- Student Profiles & Directory -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+                <h3 class="text-md font-bold text-slate-800 border-b pb-3">Student Directory (Click a student to view full profile & transactions)</h3>
+                <div id="admin-students-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+            </div>
+
+            <!-- Detailed Student View Modal/Section -->
+            <div id="student-detail-card" class="hidden bg-indigo-900 text-white p-6 rounded-2xl shadow-lg space-y-4">
+                <div class="flex justify-between items-start border-b border-indigo-700 pb-3">
+                    <div>
+                        <h3 class="text-xl font-bold" id="detail-student-name">Student Name</h3>
+                        <p class="text-xs text-indigo-300" id="detail-sibling-info"></p>
+                    </div>
+                    <button onclick="closeDetailCard()" class="text-xs bg-indigo-800 px-3 py-1 rounded-lg hover:bg-indigo-700">Close ✕</button>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                    <div>
+                        <p class="text-indigo-300 uppercase">Contact Number</p>
+                        <p class="font-bold text-sm mt-0.5" id="detail-contact">-</p>
+                    </div>
+                    <div>
+                        <p class="text-indigo-300 uppercase">Date of Birth</p>
+                        <p class="font-bold text-sm mt-0.5" id="detail-dob">-</p>
+                    </div>
+                    <div>
+                        <p class="text-indigo-300 uppercase">Star Balance</p>
+                        <p class="font-bold text-sm mt-0.5 text-amber-300" id="detail-stars">0 ⭐</p>
+                    </div>
+                    <div>
+                        <p class="text-indigo-300 uppercase">Tier Status</p>
+                        <p class="font-bold text-sm mt-0.5 text-indigo-200" id="detail-tier">Prelude</p>
+                    </div>
+                </div>
+                
+                <div class="pt-2">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-300 mb-2">Student Transaction & Audit History</h4>
+                    <div id="detail-transaction-history" class="bg-indigo-950/60 p-3 rounded-xl max-h-48 overflow-y-auto space-y-2 text-xs font-mono"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -101,19 +192,22 @@
                 data = { 
                     referralBonusStars: 20,
                     students: [
-                        { name: 'Alex Tan', family: 'family_1', wallet: 250.00, tier: 'Prelude' },
-                        { name: 'Emma Tan', family: 'family_1', wallet: 300.00, tier: 'Prelude' },
-                        { name: 'Lucas Lee', family: 'family_2', wallet: 850.00, tier: 'Crescendo' }
+                        { name: 'Alex Tan', family: 'family_1', contact: '+6012-8889999', dob: '2015-05-12', wallet: 250.00, tier: 'Prelude' },
+                        { name: 'Emma Tan', family: 'family_1', contact: '+6012-8889999', dob: '2017-08-20', wallet: 300.00, tier: 'Prelude' },
+                        { name: 'Lucas Lee', family: 'family_2', contact: '+6017-3334444', dob: '2014-01-05', wallet: 850.00, tier: 'Crescendo' }
                     ],
                     familyWallets: {
                         'family_1': { wallet: 550.00, stars: 150, tier: 'Ensemble' },
                         'family_2': { wallet: 850.00, stars: 420, tier: 'Crescendo' }
                     },
                     claimedVouchers: [], 
-                    bookings: [],
                     workshops: [
                         { id: 101, title: "Masterclass Piano Technique", price: 88, exclusive: false, date: "Oct 15, 2026", registered: ['Alex Tan'] },
                         { id: 102, title: "Advanced Violin Masterclass", price: 150, exclusive: true, date: "Oct 22, 2026", registered: ['Emma Tan'] }
+                    ],
+                    transactions: [
+                        { date: '2026-09-28', student: 'Alex Tan', family: 'family_1', desc: 'Registered for Piano Technique Workshop', amount: '- RM 88.00', starsChange: '+20 ⭐' },
+                        { date: '2026-09-25', student: 'Alex Tan', family: 'family_1', desc: 'Claimed RM20 Off Voucher', amount: '0.00', starsChange: '-400 ⭐' }
                     ]
                 };
             }
@@ -126,12 +220,12 @@
         }
 
         function switchTab(tab) {
-            ['pos', 'vouchers', 'referrals'].forEach(t => {
+            ['pos', 'vouchers', 'students'].forEach(t => {
                 document.getElementById(`content-${t}`).classList.add('hidden');
-                document.getElementById(`tab-${t}`).className = "px-4 py-2 bg-slate-100 text-slate-600 rounded-lg";
+                document.getElementById(`tab-${t}`).className = "px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap";
             });
             document.getElementById(`content-${tab}`).classList.remove('hidden');
-            document.getElementById(`tab-${tab}`).className = "px-4 py-2 bg-slate-900 text-white rounded-lg";
+            document.getElementById(`tab-${tab}`).className = "px-4 py-2 bg-slate-900 text-white rounded-lg whitespace-nowrap";
         }
 
         function approveVoucher(vId) {
@@ -139,14 +233,21 @@
             const voucher = data.claimedVouchers.find(v => v.id === vId);
             if (voucher) {
                 voucher.status = 'Approved & Redeemed';
+                data.transactions.unshift({
+                    date: new Date().toISOString().split('T')[0],
+                    student: voucher.claimedBy,
+                    family: voucher.family,
+                    desc: `Voucher Approved: ${voucher.title}`,
+                    amount: 'RM 0.00',
+                    starsChange: `-${voucher.cost} ⭐`
+                });
                 saveData(data);
-                alert('Voucher approved and marked as redeemed! It is now available to apply during checkout.');
+                alert('Voucher approved and marked as redeemed!');
             }
         }
 
         function calculatePOS() {
             const data = getData();
-            const studentName = document.getElementById('pos-student').value;
             const itemId = document.getElementById('pos-item').value;
             const voucherId = document.getElementById('pos-voucher').value;
 
@@ -159,13 +260,9 @@
             if (voucherId !== 'none') {
                 const voucher = data.claimedVouchers.find(v => v.id == voucherId);
                 if (voucher) {
-                    if (voucher.discountType === 'flat') {
-                        discount = voucher.discountVal;
-                    } else if (voucher.discountType === 'percent') {
-                        discount = (originalPrice * voucher.discountVal) / 100;
-                    } else if (voucher.discountType === 'free') {
-                        discount = originalPrice;
-                    }
+                    if (voucher.discountType === 'flat') discount = voucher.discountVal;
+                    else if (voucher.discountType === 'percent') discount = (originalPrice * voucher.discountVal) / 100;
+                    else if (voucher.discountType === 'free') discount = originalPrice;
                 }
             }
 
@@ -178,12 +275,32 @@
         }
 
         function processCheckout() {
-            alert('Transaction complete! Receipt issued.');
+            const data = getData();
+            const studentName = document.getElementById('pos-student').value;
+            const itemId = document.getElementById('pos-item').value;
+            const workshop = data.workshops.find(w => w.id == itemId);
+            const student = data.students.find(s => s.name === studentName);
+
+            if (student && workshop) {
+                data.transactions.unshift({
+                    date: new Date().toISOString().split('T')[0],
+                    student: student.name,
+                    family: student.family,
+                    desc: `Payment for ${workshop.title}`,
+                    amount: `- RM ${workshop.price.toFixed(2)}`,
+                    starsChange: '+10 ⭐'
+                });
+                saveData(data);
+                alert(`Checkout completed for ${studentName}!`);
+            }
         }
 
         function registerNewStudent() {
             const nameInput = document.getElementById('reg-student-name').value.trim();
+            const contactInput = document.getElementById('reg-contact').value.trim();
+            const dobInput = document.getElementById('reg-dob').value;
             const referrer = document.getElementById('reg-referred-by').value;
+
             if (!nameInput) {
                 alert('Please enter student name');
                 return;
@@ -194,12 +311,23 @@
             
             data.students.push({
                 name: nameInput,
+                contact: contactInput || 'Not Provided',
+                dob: dobInput || 'Not Provided',
                 family: newFamKey,
                 wallet: 0,
                 tier: 'Prelude'
             });
 
             data.familyWallets[newFamKey] = { wallet: 0, stars: 0, tier: 'Prelude' };
+
+            data.transactions.unshift({
+                date: new Date().toISOString().split('T')[0],
+                student: nameInput,
+                family: newFamKey,
+                desc: 'Student Profile Created',
+                amount: 'RM 0.00',
+                starsChange: '+0 ⭐'
+            });
 
             if (referrer !== 'none') {
                 const refStudent = data.students.find(s => s.name === referrer);
@@ -212,24 +340,126 @@
             }
 
             document.getElementById('reg-student-name').value = '';
+            document.getElementById('reg-contact').value = '';
+            document.getElementById('reg-dob').value = '';
             saveData(data);
+        }
+
+        function createNewWorkshop() {
+            const title = document.getElementById(' workshop-title').value.trim() || document.getElementById('workshop-title')?.value.trim();
+            const price = parseFloat(document.getElementById('workshop-price').value);
+            const date = document.getElementById('workshop-date').value.trim();
+            const exclusive = document.getElementById('workshop-exclusive').checked;
+
+            if (!title || isNaN(price) || !date) {
+                alert('Please fill in all workshop details (Title, Price, Date).');
+                return;
+            }
+
+            const data = getData();
+            data.workshops.push({
+                id: Date.now(),
+                title: title,
+                price: price,
+                exclusive: exclusive,
+                date: date,
+                registered: []
+            });
+
+            saveData(data);
+            alert(`Workshop "${title}" published successfully!`);
+            
+            document.getElementById(' workshop-title').value = '';
+            document.getElementById('workshop-price').value = '';
+            document.getElementById('workshop-date').value = '';
+            document.getElementById('workshop-exclusive').checked = false;
+        }
+
+        function deleteWorkshop(wId) {
+            if (!confirm('Are you sure you want to delete this workshop?')) return;
+            const data = getData();
+            data.workshops = data.workshops.filter(w => w.id !== wId);
+            saveData(data);
+        }
+
+        function viewAttendance(wId) {
+            const data = getData();
+            const workshop = data.workshops.find(w => w.id === wId);
+            if (!workshop) return;
+
+            document.getElementById('attendance-workshop-title').innerText = `Attendance List: ${workshop.title}`;
+            document.getElementById('attendance-workshop-date').innerText = `Date: ${workshop.date} | Total Registered: ${workshop.registered.length}`;
+
+            document.getElementById('attendance-student-list').innerHTML = workshop.registered.length === 0 ?
+                `<p class="text-slate-400 italic">No students registered for this workshop yet.</p>` :
+                workshop.registered.map((studentName, idx) => {
+                    const studentObj = data.students.find(s => s.name === studentName);
+                    return `
+                        <div class="bg-slate-800 p-2.5 rounded-lg border border-slate-700 flex justify-between items-center">
+                            <div>
+                                <span class="font-bold text-slate-100">${idx + 1}. ${studentName}</span>
+                                <span class="text-slate-400 ml-2">Contact: ${studentObj ? studentObj.contact : 'N/A'}</span>
+                            </div>
+                            <span class="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-semibold">Confirmed ✓</span>
+                        </div>
+                    `;
+                }).join('');
+
+            document.getElementById('workshop-attendance-card').classList.remove('hidden');
+        }
+
+        function closeAttendanceCard() {
+            document.getElementById('workshop-attendance-card').classList.add('hidden');
+        }
+
+        function viewStudentDetail(studentName) {
+            const data = getData();
+            const student = data.students.find(s => s.name === studentName);
+            if (!student) return;
+
+            const family = data.familyWallets[student.family] || { stars: 0, tier: 'Prelude' };
+            const siblings = data.students.filter(s => s.family === student.family && s.name !== student.name).map(s => s.name);
+
+            document.getElementById('detail-student-name').innerText = student.name;
+            document.getElementById('detail-sibling-info').innerText = siblings.length > 0 ? `Shared Family Account with: ${siblings.join(', ')}` : 'Individual Account';
+            document.getElementById('detail-contact').innerText = student.contact || 'Not Provided';
+            document.getElementById('detail-dob').innerText = student.dob || 'Not Provided';
+            document.getElementById('detail-stars').innerText = `${family.stars} ⭐`;
+            document.getElementById('detail-tier').innerText = `${family.tier} Tier`;
+
+            const history = data.transactions.filter(t => t.family === student.family || t.student === student.name);
+            document.getElementById('detail-transaction-history').innerHTML = history.length === 0 ?
+                `<p class="text-indigo-300 italic">No transactions recorded yet.</p>` :
+                history.map(t => `
+                    <div class="border-b border-indigo-800/60 pb-1 flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-indigo-100">${t.desc} <span class="text-indigo-400 font-normal">(${t.student})</span></p>
+                            <p class="text-indigo-400 text-[10px]">${t.date}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold ${t.amount.startsWith('-') ? 'text-amber-300' : 'text-emerald-300'}">${t.amount}</p>
+                            <p class="text-indigo-300 text-[10px]">${t.starsChange}</p>
+                        </div>
+                    </div>
+                `).join('');
+
+            document.getElementById('student-detail-card').classList.remove('hidden');
+        }
+
+        function closeDetailCard() {
+            document.getElementById('student-detail-card').classList.add('hidden');
         }
 
         function updateAdminUI() {
             const data = getData();
 
-            // Populate Student Selectors
             document.getElementById('pos-student').innerHTML = data.students.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
             document.getElementById('reg-referred-by').innerHTML = `<option value="none">-- Direct Walk-in / No Referral --</option>` + data.students.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
-
-            // Populate Item Selector
             document.getElementById('pos-item').innerHTML = data.workshops.map(w => `<option value="${w.id}">${w.title} (RM ${w.price})</option>`).join('');
 
-            // Populate Approved Vouchers
             const approvedVouchers = data.claimedVouchers.filter(v => v.status === 'Approved & Redeemed');
             document.getElementById('pos-voucher').innerHTML = `<option value="none">-- No Voucher Applied --</option>` + approvedVouchers.map(v => `<option value="${v.id}">${v.title} (${v.claimedBy})</option>`).join('');
 
-            // Render Pending Vouchers
             const pendingVouchers = data.claimedVouchers.filter(v => v.status === 'Pending Verification');
             document.getElementById('admin-vouchers-list').innerHTML = pendingVouchers.length === 0 ?
                 `<p class="text-xs text-slate-400 italic">No pending vouchers to review.</p>` :
@@ -243,15 +473,31 @@
                     </div>
                 `).join('');
 
-            // Render All Registered Students & Links
+            // Render Workshops List with Attendance Button
+            document.getElementById('admin-workshops-list').innerHTML = data.workshops.length === 0 ?
+                `<p class="text-xs text-slate-400 italic">No workshops published yet.</p>` :
+                data.workshops.map(w => `
+                    <div class="bg-slate-50 p-3 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
+                        <div>
+                            <p class="font-bold text-slate-800">${w.title} <span class="text-indigo-600">(${w.date})</span> - RM ${w.price} ${w.exclusive ? '<span class="text-amber-600 ml-1">⭐ Exclusive</span>' : ''}</p>
+                            <p class="text-slate-500">Registered: <span class="font-bold text-indigo-700">${w.registered.length} student(s)</span></p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="viewAttendance(${w.id})" class="px-3 py-1.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition">📋 View Attendees</button>
+                            <button onclick="deleteWorkshop(${w.id})" class="px-3 py-1.5 bg-rose-100 text-rose-700 font-semibold rounded-lg hover:bg-rose-200 transition">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+
             const parentBaseUrl = window.location.href.replace('admin.html', 'index.html');
             document.getElementById('admin-students-list').innerHTML = data.students.map(s => `
-                <div class="bg-slate-50 p-3 rounded-xl border flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs">
-                    <div>
-                        <span class="font-bold text-slate-800">${s.name}</span> 
-                        <span class="text-slate-400 ml-2">(Stars: ${data.familyWallets[s.family]?.stars || 0} ⭐)</span>
+                <div class="bg-slate-50 p-3 rounded-xl border space-y-2 text-xs">
+                    <div class="flex justify-between items-center">
+                        <button onclick="viewStudentDetail('${s.name}')" class="font-bold text-indigo-700 hover:underline text-sm">${s.name} 🔍</button>
+                        <span class="text-slate-500 font-semibold">${data.familyWallets[s.family]?.stars || 0} ⭐</span>
                     </div>
-                    <div class="font-mono text-indigo-600 bg-white px-2 py-1 rounded border select-all overflow-x-auto">
+                    <p class="text-slate-500">Contact: <span class="text-slate-800 font-medium">${s.contact || 'N/A'}</span> | DOB: <span class="text-slate-800 font-medium">${s.dob || 'N/A'}</span></p>
+                    <div class="font-mono text-indigo-600 bg-white px-2 py-1 rounded border select-all overflow-x-auto text-[11px]">
                         ${parentBaseUrl}?student=${encodeURIComponent(s.name)}
                     </div>
                 </div>
