@@ -71,7 +71,8 @@
         initFirestoreListeners();
 
         window.openParentPortal = function(studentName) {
-            const targetUrl = `portal.html?student=${encodeURIComponent(studentName)}`;
+            const baseUrl = "https://theexpressivoclub.github.io/expressivo-club/";
+            const targetUrl = `${baseUrl}?student=${encodeURIComponent(studentName)}`;
             window.open(targetUrl, '_blank');
         };
 
