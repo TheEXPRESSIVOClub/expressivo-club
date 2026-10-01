@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expressivo Club - Admin Dashboard (Live)</title>
+    <title>Expressivo Club - Admin Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { initializeFirestore, collection, doc, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHvyRDPEG9jzFbqSTuKmTjvnRDShmN6uU",
@@ -24,530 +24,338 @@
         });
 
         window.db = db;
-        window.appData = { students: [], families: {}, workshops: [], vouchers: [], transactions: [] };
+        window.adminData = { students: [], families: {}, workshops: [], vouchers: [] };
 
-        function initFirestoreListeners() {
-            onSnapshot(collection(db, "families"), (snapshot) => {
-                window.appData.families = {};
-                snapshot.forEach((docSnap) => {
-                    window.appData.families[docSnap.id] = docSnap.data();
-                });
-                updateAdminUI();
-            }, (error) => {
-                console.error("Error listening to families collection:", error);
-            });
-
+        function initAdmin() {
+            // Listen to Students
             onSnapshot(collection(db, "students"), (snapshot) => {
-                window.appData.students = [];
-                snapshot.forEach((docSnap) => {
-                    window.appData.students.push({ id: docSnap.id, ...docSnap.data() });
-                });
-                updateAdminUI();
-            }, (error) => {
-                console.error("Error listening to students collection:", error);
+                window.adminData.students = [];
+                snapshot.forEach(d => window.adminData.students.push({ id: d.id, ...d.data() }));
+                renderStudents();
+                populateDropdowns();
             });
 
+            // Listen to Families
+            onSnapshot(collection(db, "families"), (snapshot) => {
+                window.adminData.families = {};
+                snapshot.forEach(d => {
+                    window.adminData.families[d.id] = d.data();
+                });
+                renderFamilies();
+                populateDropdowns();
+            });
+
+            // Listen to Workshops
             onSnapshot(collection(db, "workshops"), (snapshot) => {
-                window.appData.workshops = [];
-                snapshot.forEach((docSnap) => {
-                    window.appData.workshops.push({ id: docSnap.id, ...docSnap.data() });
-                });
-                updateAdminUI();
-            }, (error) => {
-                console.error("Error listening to workshops collection:", error);
+                window.adminData.workshops = [];
+                snapshot.forEach(d => window.adminData.workshops.push({ id: d.id, ...d.data() }));
+                renderWorkshops();
+                populateDropdowns();
             });
 
+            // Listen to Vouchers
             onSnapshot(collection(db, "vouchers"), (snapshot) => {
-                window.appData.vouchers = [];
-                snapshot.forEach((docSnap) => {
-                    window.appData.vouchers.push({ id: docSnap.id, ...docSnap.data() });
-                });
-                updateAdminUI();
-            }, (error) => {
-                console.error("Error listening to vouchers collection:", error);
-            });
-
-            onSnapshot(collection(db, "transactions"), (snapshot) => {
-                window.appData.transactions = [];
-                snapshot.forEach((docSnap) => {
-                    window.appData.transactions.push({ id: docSnap.id, ...docSnap.data() });
-                });
-                updateAdminUI();
-            }, (error) => {
-                console.error("Error listening to transactions collection:", error);
+                window.adminData.vouchers = [];
+                snapshot.forEach(d => window.adminData.vouchers.push({ id: d.id, ...d.data() }));
+                renderVouchers();
             });
         }
 
-        initFirestoreListeners();
+        function populateDropdowns() {
+            const studentSelect = document.getElementById('admin-book-student');
+            const workshopSelect = document.getElementById('admin-book-workshop');
+            if (!studentSelect || !workshopSelect) return;
 
-        window.openParentPortal = function(studentName) {
-            const baseUrl = "https://theexpressivoclub.github.io/expressivo-club/";
-            const targetUrl = `${baseUrl}?student=${encodeURIComponent(studentName)}`;
-            window.open(targetUrl, '_blank');
-        };
+            studentSelect.innerHTML = `<option value="">-- Select Student --</option>` + 
+                window.adminData.students.map(s => `<option value="${s.id}">${s.name} (Family: ${s.family})</option>`).join('');
 
-        window.exportStudentsToExcel = function() {
-            const data = window.appData;
-            if (!data.students || data.students.length === 0) {
-                alert("No students to export!");
+            workshopSelect.innerHTML = `<option value="">-- Select Workshop --</option>` + 
+                window.adminData.workshops.map(w => `<option value="${w.id}">${w.title} (RM ${w.price})</option>`).join('');
+        }
+
+        window.adminProcessBooking = async function() {
+            const studentId = document.getElementById('admin-book-student').value;
+            const workshopId = document.getElementById('admin-book-workshop').value;
+            const customDiscount = parseFloat(document.getElementById('admin-custom-discount').value) || 0;
+
+            if (!studentId || !workshopId) {
+                alert("Please select both a student and a workshop.");
                 return;
             }
 
-            let csvContent = "data:text/csv;charset=utf-8,Student Name,Family ID,Contact Number,Membership Tier,Wallet Balance (RM),Stars\r\n";
+            const student = window.adminData.students.find(s => s.id === studentId);
+            const workshop = window.adminData.workshops.find(w => w.id === workshopId);
+            if (!student || !workshop) return;
 
-            data.students.forEach(s => {
-                const fam = data.families[s.family] || { wallet: 0, stars: 100, tier: 'Prelude' };
-                const row = [
-                    `"${s.name || ''}"`,
-                    `"${s.family || ''}"`,
-                    `"${s.contact || ''}"`,
-                    `"${fam.tier || 'Prelude'}"`,
-                    `"${Number(fam.wallet || 0).toFixed(2)}"`,
-                    `"${fam.stars || 100}"`
-                ];
-                csvContent += row.join(",") + "\r\n";
-            });
+            const familyId = student.family;
+            const family = window.adminData.families[familyId] || { wallet: 0, stars: 100, tier: 'Prelude' };
 
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "Expressivo_Club_Students.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        };
+            let basePrice = parseFloat(workshop.price) || 0;
+            let tier = family.tier || 'Prelude';
+            let tierDiscountRate = 0;
 
-        window.handleAddNewStudent = async function(e) {
-            e.preventDefault();
-            const name = document.getElementById('new-student-name').value.trim();
-            const familyId = document.getElementById('new-family-id').value.trim();
-            const contact = document.getElementById('new-student-contact').value.trim();
-            const tier = document.getElementById('new-family-tier').value;
-            const wallet = parseFloat(document.getElementById('new-family-wallet').value) || 0;
+            if (tier === 'Crescendo') tierDiscountRate = 0.05;
+            if (tier === 'Virtuoso') tierDiscountRate = 0.10;
+
+            let priceAfterTier = basePrice * (1 - tierDiscountRate);
+            let finalPrice = Math.max(0, priceAfterTier - customDiscount);
+            const currentWallet = Number(family.wallet || 0);
+
+            if (currentWallet < finalPrice) {
+                alert(`Insufficient family wallet balance! Required: RM ${finalPrice.toFixed(2)}, Available: RM ${currentWallet.toFixed(2)}`);
+                return;
+            }
+
+            const starsEarned = Math.floor(finalPrice / 2);
 
             try {
-                const famRef = doc(db, "families", familyId);
-                await setDoc(famRef, {
-                    wallet: wallet,
-                    stars: 100,
-                    tier: tier
+                // 1. Add student to workshop registered list
+                const registeredList = workshop.registered || [];
+                if (!registeredList.includes(student.name)) {
+                    registeredList.push(student.name);
+                    await updateDoc(doc(db, "workshops", workshopId), { registered: registeredList });
+                }
+
+                // 2. Deduct wallet & add stars
+                const newWallet = currentWallet - finalPrice;
+                const newStars = Number(family.stars || 100) + starsEarned;
+
+                await setDoc(doc(db, "families", familyId), {
+                    ...family,
+                    wallet: newWallet,
+                    stars: newStars
                 }, { merge: true });
 
-                await addDoc(collection(db, "students"), { name, family: familyId, contact, dob: '2016-01-01' });
-
+                // 3. Add transaction log
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
-                    student: name,
+                    student: student.name,
                     family: familyId,
-                    desc: 'Admin registered student & added initial wallet credit',
-                    amount: `+ RM ${wallet.toFixed(2)}`,
-                    starsChange: '+100 ⭐ (Welcome Bonus)'
+                    desc: `Admin Booked: ${workshop.title} (Discount: RM ${customDiscount.toFixed(2)})`,
+                    amount: `- RM ${finalPrice.toFixed(2)}`,
+                    starsChange: `+${starsEarned} ⭐`
                 });
 
-                alert(`Student "${name}" registered successfully with Tier: ${tier} & 100 welcome stars!`);
-                e.target.reset();
+                alert(`Successfully processed booking for ${student.name}! Deducted RM ${finalPrice.toFixed(2)} from family wallet.`);
+                document.getElementById('admin-custom-discount').value = '';
             } catch (err) {
-                console.error("Error adding student to Cloud Firestore: ", err);
-                alert("Error saving to database. Check your browser Console (F12) and ensure your Firestore Rules allow write access!");
+                console.error("Booking error:", err);
+                alert("Error processing booking.");
             }
-        }
+        };
 
-        window.deleteStudent = async function(studentId, studentName, familyId) {
-            if (!confirm(`Are you sure you want to remove student "${studentName}"?`)) return;
-            try {
-                await deleteDoc(doc(db, "students", studentId));
-                await addDoc(collection(db, "transactions"), {
-                    date: new Date().toISOString().split('T')[0],
-                    student: studentName,
-                    family: familyId,
-                    desc: `Admin removed student record`,
-                    amount: 'RM 0.00',
-                    starsChange: '0 ⭐'
-                });
-                alert(`Student "${studentName}" removed.`);
-            } catch (err) {
-                console.error("Error deleting student:", err);
-            }
-        }
-
-        window.addReferralStarsWithRemark = async function(familyKey) {
-            const friendName = prompt('Enter the name of the friend referred:', '');
-            if (!friendName || friendName.trim() === '') return;
-
-            const starsStr = prompt('Enter number of referral stars to add:', '20');
-            const starsToAdd = parseInt(starsStr);
-            if (isNaN(starsToAdd) || starsToAdd <= 0) return;
-
-            try {
-                const fam = window.appData.families[familyKey] || { stars: 100 };
-                const currentStars = Number(fam.stars || 100);
-                const newStars = currentStars + starsToAdd;
-
-                await setDoc(doc(db, "families", familyKey), { stars: newStars }, { merge: true });
-                await addDoc(collection(db, "transactions"), {
-                    date: new Date().toISOString().split('T')[0],
-                    student: 'Family Referral',
-                    family: familyKey,
-                    desc: `Friend Referral Bonus (Referred Friend: ${friendName.trim()})`,
-                    amount: 'RM 0.00',
-                    starsChange: `+${starsToAdd} ⭐`
-                });
-
-                alert(`Successfully added ${starsToAdd} referral stars to family "${familyKey}" for referring ${friendName.trim()}!`);
-            } catch (err) {
-                console.error("Error adding referral stars:", err);
-                alert("Error updating referral stars.");
-            }
-        }
-
-        window.adjustManualStars = async function(familyKey) {
-            const amountStr = prompt('Enter stars to add (positive) or deduct (negative):', '50');
-            if (amountStr === null) return;
-            const starsChangeAmount = parseInt(amountStr);
-            if (isNaN(starsChangeAmount)) return;
-
-            const reason = prompt('Enter reason for star adjustment:', 'Admin manual adjustment');
-            if (reason === null) return;
-
-            try {
-                const fam = window.appData.families[familyKey] || { stars: 100 };
-                const currentStars = Number(fam.stars || 100);
-                const newStars = currentStars + starsChangeAmount;
-
-                await setDoc(doc(db, "families", familyKey), { stars: newStars }, { merge: true });
-                await addDoc(collection(db, "transactions"), {
-                    date: new Date().toISOString().split('T')[0],
-                    student: 'Admin Manual',
-                    family: familyKey,
-                    desc: `Star Adjustment: ${reason}`,
-                    amount: 'RM 0.00',
-                    starsChange: `${starsChangeAmount >= 0 ? '+' : ''}${starsChangeAmount} ⭐`
-                });
-                alert('Family stars adjusted successfully!');
-            } catch (err) {
-                console.error("Error adjusting stars:", err);
-                alert("Error updating stars.");
-            }
-        }
-
-        window.handleCreateWorkshop = async function(e) {
+        // Student registration form handler
+        window.registerStudent = async function(e) {
             e.preventDefault();
-            const title = document.getElementById('ws-title').value.trim();
-            const date = document.getElementById('ws-date').value.trim();
-            const time = document.getElementById('ws-time').value.trim();
-            const teacher = document.getElementById('ws-teacher').value.trim();
-            const price = parseFloat(document.getElementById('ws-price').value) || 0;
-            const exclusive = document.getElementById('ws-exclusive').checked;
+            const name = document.getElementById('student-name').value;
+            const contact = document.getElementById('student-contact').value;
+            const family = document.getElementById('student-family').value;
 
             try {
-                await addDoc(collection(db, "workshops"), {
-                    title, date, time, teacher, price, exclusive, status: 'Open', registered: []
-                });
-                alert(`Workshop "${title}" published successfully to Cloud!`);
+                await addDoc(collection(db, "students"), { name, contact, family });
+                
+                // Ensure family document exists
+                const famRef = doc(db, "families", family);
+                await setDoc(famRef, {
+                    wallet: 50.00, // Starting welcome credit or 0
+                    stars: 100,
+                    tier: 'Prelude'
+                }, { merge: true });
+
+                alert("Student added successfully & Family account initialized!");
                 e.target.reset();
             } catch (err) {
-                console.error("Error creating workshop: ", err);
-                alert("Error publishing workshop.");
+                console.error("Error adding student: ", err);
+                alert("Error saving student.");
             }
+        };
+
+        function renderStudents() {
+            const container = document.getElementById('students-table-body');
+            if (!container) return;
+            container.innerHTML = window.adminData.students.map(s => `
+                <tr class="border-b hover:bg-slate-50">
+                    <td class="p-3 font-bold">${s.name}</td>
+                    <td class="p-3">${s.contact}</td>
+                    <td class="p-3"><span class="px-2 py-1 bg-indigo-50 text-indigo-700 font-semibold rounded">${s.family}</span></td>
+                    <td class="p-3 text-right">
+                        <button onclick="deleteStudent('${s.id}')" class="text-rose-600 font-bold hover:underline">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
         }
 
-        window.toggleWorkshopStatus = async function(wsId, currentStatus) {
-            const newStatus = currentStatus === 'Closed' ? 'Open' : 'Closed';
-            try {
-                await updateDoc(doc(db, "workshops", wsId), { status: newStatus });
-            } catch (err) {
-                console.error("Error updating workshop status:", err);
+        window.deleteStudent = async function(id) {
+            if (confirm("Are you sure you want to delete this student?")) {
+                await deleteDoc(doc(db, "students", id));
             }
+        };
+
+        function renderFamilies() {
+            const container = document.getElementById('families-list');
+            if (!container) return;
+            container.innerHTML = Object.entries(window.adminData.families).map(([id, fam]) => `
+                <div class="bg-slate-50 p-4 rounded-xl border flex justify-between items-center text-xs">
+                    <div>
+                        <h4 class="font-bold text-slate-800 text-sm">Family ID: ${id}</h4>
+                        <p class="text-slate-500 mt-0.5">Tier: <span class="font-bold text-indigo-600">${fam.tier || 'Prelude'}</span> | Stars: <span class="font-bold text-amber-600">${fam.stars || 100} ⭐</span></p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-extrabold text-slate-900">RM ${Number(fam.wallet || 0).toFixed(2)}</p>
+                        <button onclick="topUpWallet('${id}')" class="mt-1 px-3 py-1 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700">Top Up Wallet</button>
+                    </div>
+                </div>
+            `).join('');
         }
 
-        window.editWorkshop = async function(wsId, currentTitle, currentDate, currentTime, currentTeacher, currentPrice) {
-            const title = prompt("Edit Workshop Title:", currentTitle);
-            if (title === null) return;
-            const date = prompt("Edit Date:", currentDate);
-            if (date === null) return;
-            const time = prompt("Edit Time:", currentTime);
-            if (time === null) return;
-            const teacher = prompt("Edit Teacher:", currentTeacher);
-            if (teacher === null) return;
-            const priceStr = prompt("Edit Price (RM):", currentPrice);
-            if (priceStr === null) return;
-            const price = parseFloat(priceStr) || 0;
-
-            try {
-                await updateDoc(doc(db, "workshops", wsId), { title, date, time, teacher, price });
-                alert("Workshop updated successfully!");
-            } catch (err) {
-                console.error("Error editing workshop:", err);
-                alert("Error updating workshop.");
-            }
-        }
-
-        window.deleteWorkshop = async function(wsId, wsTitle) {
-            if (!confirm(`Are you sure you want to delete workshop "${wsTitle}"?`)) return;
-            try {
-                await deleteDoc(doc(db, "workshops", wsId));
-                alert("Workshop deleted.");
-            } catch (err) {
-                console.error("Error deleting workshop:", err);
-            }
-        }
-
-        window.approveVoucher = async function(docId) {
-            try {
-                const vRef = doc(db, "vouchers", docId);
-                await updateDoc(vRef, { status: 'Approved & Applied' });
-                alert('Voucher approved successfully!');
-            } catch (err) {
-                console.error("Error approving voucher:", err);
-            }
-        }
-
-        window.adjustWallet = async function(familyKey) {
-            const amountStr = prompt('Enter amount to add (positive) or deduct (negative) for family wallet:', '50');
-            if (amountStr === null) return;
-            const amount = parseFloat(amountStr);
-            if (isNaN(amount)) return;
-
-            const fam = window.appData.families[familyKey] || { wallet: 0 };
-            const newTotal = (fam.wallet || 0) + amount;
-
-            try {
-                await setDoc(doc(db, "families", familyKey), { wallet: newTotal }, { merge: true });
+        window.topUpWallet = async function(familyId) {
+            const amount = prompt("Enter top-up amount in RM:");
+            if (amount && !isNaN(amount)) {
+                const fam = window.adminData.families[familyId] || { wallet: 0 };
+                const newWallet = Number(fam.wallet || 0) + parseFloat(amount);
+                await updateDoc(doc(db, "families", familyId), { wallet: newWallet });
+                
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
-                    student: 'Family Admin',
-                    family: familyKey,
-                    desc: 'Admin manual wallet adjustment',
-                    amount: `${amount >= 0 ? '+' : ''} RM ${amount.toFixed(2)}`,
-                    starsChange: '0 ⭐'
+                    student: `Family Top-Up (${familyId})`,
+                    family: familyId,
+                    desc: `Wallet Top-Up by Admin`,
+                    amount: `+ RM ${parseFloat(amount).toFixed(2)}`,
+                    starsChange: `0 ⭐`
                 });
-                alert('Wallet updated!');
-            } catch (err) {
-                console.error("Error updating wallet:", err);
+                alert(`Top-up successful! New balance: RM ${newWallet.toFixed(2)}`);
             }
+        };
+
+        function renderWorkshops() {
+            const container = document.getElementById('workshops-list');
+            if (!container) return;
+            container.innerHTML = window.adminData.workshops.map(w => `
+                <div class="bg-slate-50 p-4 rounded-xl border flex justify-between items-center text-xs">
+                    <div>
+                        <h4 class="font-bold text-slate-800 text-sm">${w.title} - RM ${w.price}</h4>
+                        <p class="text-slate-500">Registered: ${(w.registered || []).join(', ') || 'None'}</p>
+                    </div>
+                    <button onclick="deleteWorkshop('${w.id}')" class="text-rose-600 font-bold hover:underline">Delete</button>
+                </div>
+            `).join('');
         }
+
+        window.deleteWorkshop = async function(id) {
+            if (confirm("Delete workshop?")) await deleteDoc(doc(db, "workshops", id));
+        };
+
+        window.createWorkshop = async function(e) {
+            e.preventDefault();
+            const title = document.getElementById('ws-title').value;
+            const price = document.getElementById('ws-price').value;
+            const date = document.getElementById('ws-date').value;
+
+            await addDoc(collection(db, "workshops"), { title, price, date, registered: [], status: 'Open' });
+            alert("Workshop created!");
+            e.target.reset();
+        };
+
+        function renderVouchers() {
+            const container = document.getElementById('vouchers-list');
+            if (!container) return;
+            container.innerHTML = window.adminData.vouchers.map(v => `
+                <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center text-xs">
+                    <div>
+                        <p class="font-bold">${v.title} (${v.cost} ⭐)</p>
+                        <p class="text-slate-500">Claimed by: ${v.claimedBy} (Family: ${v.family}) - Status: <span class="text-amber-600 font-bold">${v.status}</span></p>
+                    </div>
+                    <div>
+                        ${v.status === 'Pending Verification' ? `<button onclick="approveVoucher('${v.id}', '${v.family}', '${v.title}')" class="px-3 py-1.5 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700">Approve Voucher</button>` : `<span class="text-emerald-600 font-bold">Approved ✓</span>`}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.approveVoucher = async function(vId, familyId, title) {
+            await updateDoc(doc(db, "vouchers", vId), { status: 'Approved' });
+            alert(`Voucher "${title}" approved for family ${familyId}! Staff can now apply manual discounts when booking.`);
+        };
+
+        window.onload = initAdmin;
     </script>
 </head>
-<body class="bg-slate-100 text-slate-800 font-sans p-4 sm:p-6">
-
-    <div class="max-w-6xl mx-auto space-y-6">
-        <header class="bg-slate-900 text-white p-6 rounded-2xl shadow-lg flex justify-between items-center">
-            <div>
-                <h1 class="text-2xl font-bold">🎹 Expressivo Club - Admin Portal</h1>
-                <p class="text-xs text-slate-400 mt-1">Live Cloud Management System</p>
-            </div>
+<body class="bg-slate-100 text-slate-800 font-sans p-6">
+    <div class="max-w-4xl mx-auto space-y-6">
+        <header class="bg-slate-900 text-white p-6 rounded-2xl shadow-lg">
+            <h1 class="text-2xl font-bold">🎹 Expressivo Club - Admin Dashboard</h1>
+            <p class="text-xs text-indigo-300 mt-1">Manage students, wallets, manual workshop bookings, and vouchers.</p>
         </header>
 
-        <div class="flex bg-white p-2 rounded-xl shadow-sm border space-x-2 text-xs sm:text-sm font-semibold overflow-x-auto">
-            <button onclick="switchAdminTab('students')" id="admin-tab-students" class="px-4 py-2 bg-slate-900 text-white rounded-lg whitespace-nowrap">🎓 Students & Families</button>
-            <button onclick="switchAdminTab('workshops')" id="admin-tab-workshops" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">📅 Manage Workshops</button>
-            <button onclick="switchAdminTab('vouchers')" id="admin-tab-vouchers" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">🎁 Voucher Approvals</button>
-            <button onclick="switchAdminTab('transactions')" id="admin-tab-transactions" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">📜 Audit Log</button>
-        </div>
-
-        <!-- TAB 1 -->
-        <div id="admin-content-students" class="space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4 h-fit">
-                    <h2 class="text-base font-bold text-slate-800 border-b pb-3">➕ Register New Student</h2>
-                    <form onsubmit="handleAddNewStudent(event)" class="space-y-3 text-xs">
-                        <div>
-                            <label class="block font-bold text-slate-600 mb-1">Student Full Name</label>
-                            <input type="text" id="new-student-name" required placeholder="e.g. Chloe Tan" class="w-full p-2.5 border rounded-xl outline-none">
-                        </div>
-                        <div>
-                            <label class="block font-bold text-slate-600 mb-1">Family Group ID / Name</label>
-                            <input type="text" id="new-family-id" required placeholder="e.g. family_1" class="w-full p-2.5 border rounded-xl outline-none">
-                        </div>
-                        <div>
-                            <label class="block font-bold text-slate-600 mb-1">Contact Number</label>
-                            <input type="text" id="new-student-contact" required placeholder="+6012-3456789" class="w-full p-2.5 border rounded-xl outline-none">
-                        </div>
-                        <div>
-                            <label class="block font-bold text-slate-600 mb-1">Membership Tier</label>
-                            <select id="new-family-tier" class="w-full p-2.5 border rounded-xl bg-white outline-none">
-                                <option value="Prelude">Prelude (Basic)</option>
-                                <option value="Ensemble">Ensemble (Silver)</option>
-                                <option value="Crescendo">Crescendo (Gold)</option>
-                                <option value="Virtuoso">Virtuoso (Platinum)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block font-bold text-slate-600 mb-1">Initial Wallet Credit (RM)</label>
-                            <input type="number" id="new-family-wallet" value="100.00" step="0.01" class="w-full p-2.5 border rounded-xl outline-none">
-                        </div>
-                        <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition">Save to Cloud (+100 Stars)</button>
-                    </form>
+        <!-- MANUAL WORKSHOP BOOKING & VOUCHER DEDUCTION SECTION -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+            <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-3">🎟️ Admin Workshop Booking & Voucher Deduction</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Select Student</label>
+                    <select id="admin-book-student" class="w-full p-2.5 border rounded-xl bg-slate-50 font-semibold"></select>
                 </div>
-
-                <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-3 gap-2">
-                        <h2 class="text-base font-bold text-slate-800">👥 Active Cloud Student Directory</h2>
-                        <button onclick="exportStudentsToExcel()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition">📥 Export to Excel (CSV)</button>
-                    </div>
-                    <div id="admin-students-list" class="space-y-3 text-xs"></div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Select Workshop</label>
+                    <select id="admin-book-workshop" class="w-full p-2.5 border rounded-xl bg-slate-50 font-semibold"></select>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Voucher / Extra Discount (RM)</label>
+                    <input type="number" id="admin-custom-discount" placeholder="e.g. 5 or 10" class="w-full p-2.5 border rounded-xl bg-slate-50 font-semibold">
                 </div>
             </div>
+            <button onclick="adminProcessBooking()" class="w-full py-3 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 transition">Process Booking & Deduct Family Wallet</button>
         </div>
 
-        <!-- TAB 2 -->
-        <div id="admin-content-workshops" class="hidden space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4 h-fit">
-                    <h2 class="text-base font-bold text-slate-800 border-b pb-3">➕ Schedule Masterclass</h2>
-                    <form onsubmit="handleCreateWorkshop(event)" class="space-y-3 text-xs">
-                        <div>
-                            <label class="block font-bold text-slate-600 mb-1">Workshop Title</label>
-                            <input type="text" id="ws-title" required placeholder="e.g. Jazz Piano Masterclass" class="w-full p-2.5 border rounded-xl outline-none">
-                        </div>
-                        <div>
-                            <label class="block font-bold text-slate-600 mb-1">Date</label>
-                            <input type="text" id="ws-date" required placeholder="e.g. Nov 10, 2026" class="w-full p-2.5 border rounded-xl outline-none">
-                        </div>
-                        <div>
-                            <label class="block font-bold text-slate-600 mb-1">Time</label>
-                            <input type="text" id="ws-time" required placeholder="e.g. 2:00 PM - 4:00 PM" class="w-full p-2.5 border rounded-xl outline-none">
-                        </div>
-                        <div>
-                            <label class="block font-bold text-slate-600 mb-1">Teacher / Instructor</label>
-                            <input type="text" id="ws-teacher" required placeholder="e.g. Teacher Sarah" class="w-full p-2.5 border rounded-xl outline-none">
-                        </div>
-                        <div>
-                            <label class="block font-bold text-slate-600 mb-1">Price (RM)</label>
-                            <input type="number" id="ws-price" required value="100" class="w-full p-2.5 border rounded-xl outline-none">
-                        </div>
-                        <div class="flex items-center gap-2 pt-1">
-                            <input type="checkbox" id="ws-exclusive" class="w-4 h-4 text-indigo-600 rounded">
-                            <label for="ws-exclusive" class="font-bold text-slate-700">Exclusive (Crescendo/Virtuoso Only)</label>
-                        </div>
-                        <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition">Publish Workshop</button>
-                    </form>
-                </div>
-
-                <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                    <h2 class="text-base font-bold text-slate-800 border-b pb-3">📅 Active Workshops</h2>
-                    <div id="admin-workshops-list" class="space-y-3 text-xs"></div>
-                </div>
-            </div>
+        <!-- ADD STUDENT -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+            <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-3">Add New Student</h2>
+            <form onsubmit="registerStudent(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <input type="text" id="student-name" placeholder="Student Name" required class="p-2.5 border rounded-xl">
+                <input type="text" id="student-contact" placeholder="Contact Number" required class="p-2.5 border rounded-xl">
+                <input type="text" id="student-family" placeholder="Family Group ID (e.g. fam_tan)" required class="p-2.5 border rounded-xl">
+                <button type="submit" class="sm:col-span-3 py-2.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition">Add Student & Initialize Family Account</button>
+            </form>
         </div>
 
-        <!-- TAB 3 -->
-        <div id="admin-content-vouchers" class="hidden space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                <h2 class="text-base font-bold text-slate-800 border-b pb-3">🎁 Pending Voucher Claims</h2>
-                <div id="admin-vouchers-list" class="space-y-3 text-xs"></div>
-            </div>
+        <!-- CREATE WORKSHOP -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+            <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-3">Create New Workshop</h2>
+            <form onsubmit="createWorkshop(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <input type="text" id="ws-title" placeholder="Workshop Title" required class="p-2.5 border rounded-xl">
+                <input type="number" step="0.01" id="ws-price" placeholder="Price (RM)" required class="p-2.5 border rounded-xl">
+                <input type="date" id="ws-date" required class="p-2.5 border rounded-xl">
+                <button type="submit" class="sm:col-span-3 py-2.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition">Publish Workshop</button>
+            </form>
         </div>
 
-        <!-- TAB 4 -->
-        <div id="admin-content-transactions" class="hidden space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                <h2 class="text-base font-bold text-slate-800 border-b pb-3">📜 Complete System Audit Log</h2>
-                <div id="admin-transactions-list" class="space-y-2 text-xs"></div>
-            </div>
+        <!-- FAMILIES WALLET LIST -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+            <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-3">Family Wallets & Balances</h2>
+            <div id="families-list" class="space-y-3"></div>
+        </div>
+
+        <!-- VOUCHERS LIST -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+            <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-3">Pending Parent Star Redemptions</h2>
+            <div id="vouchers-list" class="space-y-3"></div>
+        </div>
+
+        <!-- STUDENTS LIST -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+            <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-3">Student Directory</h2>
+            <table class="w-full text-left text-xs">
+                <thead>
+                    <tr class="border-b text-slate-400">
+                        <th class="p-3">Name</th>
+                        <th class="p-3">Contact</th>
+                        <th class="p-3">Family ID</th>
+                        <th class="p-3 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="students-table-body"></tbody>
+            </table>
         </div>
     </div>
-
-    <script>
-        function switchAdminTab(tab) {
-            ['students', 'workshops', 'vouchers', 'transactions'].forEach(t => {
-                document.getElementById(`admin-content-${t}`).classList.add('hidden');
-                document.getElementById(`admin-tab-${t}`).className = "px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap";
-            });
-            document.getElementById(`admin-content-${tab}`).classList.remove('hidden');
-            document.getElementById(`admin-tab-${tab}`).className = "px-4 py-2 bg-slate-900 text-white rounded-lg whitespace-nowrap";
-        }
-
-        function updateAdminUI() {
-            const data = window.appData;
-            const studentsContainer = document.getElementById('admin-students-list');
-            const uniqueFamilies = [...new Set(data.students.map(s => s.family))];
-
-            if (uniqueFamilies.length === 0) {
-                studentsContainer.innerHTML = `<p class="text-slate-400 italic">No students registered in cloud yet.</p>`;
-            } else {
-                studentsContainer.innerHTML = uniqueFamilies.map(famKey => {
-                    const famStudents = data.students.filter(s => s.family === famKey);
-                    const famWallet = data.families[famKey] || { wallet: 0, stars: 100, tier: 'Prelude' };
-                    const studentName = famStudents[0]?.name || '';
-
-                    return `
-                        <div class="bg-slate-50 p-4 rounded-xl border space-y-3">
-                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-2">
-                                <div>
-                                    <h3 class="font-bold text-slate-800">Family Group: <span class="text-indigo-600">${famKey}</span></h3>
-                                    <p class="text-slate-500">Tier: <span class="font-semibold text-slate-700">${famWallet.tier}</span> | Wallet: <span class="font-bold text-emerald-600">RM ${Number(famWallet.wallet || 0).toFixed(2)}</span> | Stars: <span class="font-bold text-amber-600">${famWallet.stars || 100} ⭐</span></p>
-                                </div>
-                                <div class="flex flex-wrap gap-2">
-                                    <button onclick="addReferralStarsWithRemark('${famKey}')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg transition">+ Ref ⭐ (Friend Name)</button>
-                                    <button onclick="adjustManualStars('${famKey}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition">± Manual Stars</button>
-                                    <button onclick="adjustWallet('${famKey}')" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition">Adjust Wallet</button>
-                                    <button onclick="openParentPortal('${studentName}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition">Open Portal ↗</button>
-                                </div>
-                            </div>
-                            <div class="space-y-1">
-                                <p class="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Registered Siblings:</p>
-                                <div class="flex flex-wrap gap-2">
-                                    ${famStudents.map(s => `
-                                        <span class="px-2.5 py-1.5 bg-white border rounded-lg text-slate-700 font-medium flex items-center gap-2">
-                                            ${s.name} (${s.contact})
-                                            <button onclick="deleteStudent('${s.id}', '${s.name}', '${famKey}')" class="text-rose-500 hover:text-rose-700 font-bold ml-1">🗑️</button>
-                                        </span>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-
-            const wsContainer = document.getElementById('admin-workshops-list');
-            wsContainer.innerHTML = data.workshops.length === 0 ? `<p class="text-slate-400 italic">No workshops scheduled.</p>` :
-                data.workshops.map(w => `
-                    <div class="bg-slate-50 p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <div>
-                            <h4 class="font-bold text-slate-800">${w.title} ${w.exclusive ? '<span class="text-amber-600">⭐ Exclusive</span>' : ''} 
-                                <span class="ml-2 px-2 py-0.5 rounded text-[10px] font-bold ${w.status === 'Closed' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}">${w.status || 'Open'}</span>
-                            </h4>
-                            <p class="text-slate-500">Date: ${w.date} | Time: ${w.time || 'TBD'} | Teacher: ${w.teacher || 'TBD'} | Price: RM ${w.price}</p>
-                            <p class="text-slate-600 mt-1">Registered: <span class="font-semibold">${(w.registered || []).join(', ') || 'None yet'}</span></p>
-                        </div>
-                        <div class="flex flex-wrap gap-1.5">
-                            <button onclick="toggleWorkshopStatus('${w.id}', '${w.status || 'Open'}')" class="px-3 py-1.5 ${w.status === 'Closed' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'} text-white font-bold rounded-lg transition">${w.status === 'Closed' ? 'Open Reg' : 'Close Reg'}</button>
-                            <button onclick="editWorkshop('${w.id}', '${w.title}', '${w.date}', '${w.time || ''}', '${w.teacher || ''}', '${w.price}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition">Edit</button>
-                            <button onclick="deleteWorkshop('${w.id}', '${w.title}')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg transition">Delete</button>
-                        </div>
-                    </div>
-                `).join('');
-
-            const vContainer = document.getElementById('admin-vouchers-list');
-            const pendingVouchers = data.vouchers.filter(v => v.status === 'Pending Verification');
-            vContainer.innerHTML = pendingVouchers.length === 0 ? `<p class="text-slate-400 italic">No pending voucher claims.</p>` :
-                pendingVouchers.map(v => `
-                    <div class="bg-slate-50 p-4 rounded-xl border flex justify-between items-center">
-                        <div>
-                            <h4 class="font-bold text-slate-800">${v.title}</h4>
-                            <p class="text-slate-500">Claimed by: <span class="font-semibold text-slate-700">${v.claimedBy}</span> (Family: ${v.family}) | Cost: <span class="text-amber-600 font-bold">${v.cost} Stars</span></p>
-                        </div>
-                        <button onclick="approveVoucher('${v.id}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition">Approve Claim</button>
-                    </div>
-                `).join('');
-
-            const txContainer = document.getElementById('admin-transactions-list');
-            txContainer.innerHTML = data.transactions.length === 0 ? `<p class="text-slate-400 italic">No transactions recorded.</p>` :
-                data.transactions.map(t => `
-                    <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center">
-                        <div>
-                            <p class="font-bold text-slate-800">${t.desc} <span class="text-indigo-600">(${t.student} / ${t.family})</span></p>
-                            <p class="text-slate-400 text-[10px]">${t.date}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="font-bold ${t.amount && t.amount.startsWith('-') ? 'text-rose-600' : 'text-emerald-600'}">${t.amount || 'RM 0.00'}</p>
-                            <p class="text-amber-600 text-[10px] font-bold">${t.starsChange || ''}</p>
-                        </div>
-                    </div>
-                `).join('');
-        }
-    </script>
 </body>
 </html>
