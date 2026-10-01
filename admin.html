@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHvyRDPEG9jzFbqSTuKmTjvnRDShmN6uU",
@@ -24,7 +24,17 @@
         });
 
         window.db = db;
-        window.appData = { students: [], families: {}, workshops: [], vouchers: [], transactions: [], activePosStudentId: null };
+        window.appData = { 
+            students: [], 
+            families: {}, 
+            workshops: [], 
+            vouchers: [], 
+            transactions: [], 
+            activePosStudentId: null,
+            selectedVoucherId: null,
+            selectedVoucherDiscount: 0,
+            selectedVoucherTitle: "None"
+        };
 
         function initFirestoreListeners() {
             onSnapshot(collection(db, "families"), (snapshot) => {
@@ -151,7 +161,7 @@
                 e.target.reset();
             } catch (err) {
                 console.error("Error adding student to Cloud Firestore: ", err);
-                alert("Error saving to database. Check your browser Console (F12) and ensure your Firestore Rules allow write access!");
+                alert("Error saving to database. Check your browser Console (F12).");
             }
         }
 
@@ -196,7 +206,7 @@
                     starsChange: `+${starsToAdd} ⭐`
                 });
 
-                alert(`Successfully added ${starsToAdd} referral stars to family "${familyKey}" for referring ${friendName.trim()}!`);
+                alert(`Successfully added ${starsToAdd} referral stars to family "${familyKey}"!`);
             } catch (err) {
                 console.error("Error adding referral stars:", err);
                 alert("Error updating referral stars.");
@@ -229,7 +239,6 @@
                 alert('Family stars adjusted successfully!');
             } catch (err) {
                 console.error("Error adjusting stars:", err);
-                alert("Error updating stars.");
             }
         }
 
@@ -246,7 +255,7 @@
                 await addDoc(collection(db, "workshops"), {
                     title, date, time, teacher, price, exclusive, status: 'Open', registered: []
                 });
-                alert(`Workshop "${title}" published successfully to Cloud!`);
+                alert(`Workshop "${title}" published successfully!`);
                 e.target.reset();
             } catch (err) {
                 console.error("Error creating workshop: ", err);
@@ -281,7 +290,6 @@
                 alert("Workshop updated successfully!");
             } catch (err) {
                 console.error("Error editing workshop:", err);
-                alert("Error updating workshop.");
             }
         }
 
@@ -298,7 +306,7 @@
         window.approveVoucher = async function(docId) {
             try {
                 const vRef = doc(db, "vouchers", docId);
-                await updateDoc(vRef, { status: 'Approved & Applied' });
+                await updateDoc(vRef, { status: 'Approved & Available' });
                 alert('Voucher approved successfully!');
             } catch (err) {
                 console.error("Error approving voucher:", err);
@@ -339,7 +347,7 @@
                 return;
             }
 
-            const reason = prompt('Enter reason for wallet deduction (e.g., Material fee, Lesson payment):', 'Admin wallet deduction');
+            const reason = prompt('Enter reason for wallet deduction (e.g., Material fee):', 'Admin wallet deduction');
             if (reason === null) return;
 
             const fam = window.appData.families[familyKey] || { wallet: 0 };
@@ -356,19 +364,21 @@
                     amount: `- RM ${amount.toFixed(2)}`,
                     starsChange: '0 ⭐'
                 });
-                alert(`Successfully deducted RM ${amount.toFixed(2)} from family "${familyKey}" wallet!`);
+                alert(`Successfully deducted RM ${amount.toFixed(2)} from family wallet!`);
             } catch (err) {
                 console.error("Error deducting wallet:", err);
-                alert("Error processing wallet deduction.");
             }
         }
 
         window.changePosStudent = function(studentId) {
             window.appData.activePosStudentId = studentId;
+            window.appData.selectedVoucherId = null;
+            window.appData.selectedVoucherDiscount = 0;
+            window.appData.selectedVoucherTitle = "None";
             updateAdminUI();
         }
 
-        window.calculatePosCheckout = function() {
+        window.onWorkshopDropdownChange = function() {
             const wsSelect = document.getElementById('pos-ws-select');
             const priceInput = document.getElementById('pos-original-price');
             if (!wsSelect || !priceInput) return;
@@ -376,6 +386,20 @@
             const selectedOption = wsSelect.options[wsSelect.selectedIndex];
             const basePrice = parseFloat(selectedOption.getAttribute('data-price') || '120');
             priceInput.value = basePrice.toFixed(2);
+            calculatePosCheckout();
+        }
+
+        window.selectPosVoucher = function(voucherId, title, discountValue) {
+            window.appData.selectedVoucherId = voucherId;
+            window.appData.selectedVoucherDiscount = parseFloat(discountValue) || 0;
+            window.appData.selectedVoucherTitle = title;
+            updateAdminUI();
+        }
+
+        window.calculatePosCheckout = function() {
+            const priceInput = document.getElementById('pos-original-price');
+            if (!priceInput) return;
+            const basePrice = parseFloat(priceInput.value) || 0;
 
             const student = window.appData.students.find(s => s.id === window.appData.activePosStudentId);
             const familyKey = student ? student.family : null;
@@ -387,12 +411,12 @@
             else if (family.tier === 'Virtuoso') tierDiscountRate = 0.10;
 
             const tierDiscountAmount = basePrice * tierDiscountRate;
-            const voucherDiscount = 50.00; // Simulated voucher deduction
+            const voucherDiscount = window.appData.selectedVoucherDiscount;
             const netAmount = Math.max(0, basePrice - tierDiscountAmount - voucherDiscount);
             const starsCredited = Math.round(netAmount * 2);
 
             document.getElementById('breakdown-original').innerText = `RM ${basePrice.toFixed(2)}`;
-            document.getElementById('breakdown-discount').innerText = `- RM ${(tierDiscountAmount + voucherDiscount).toFixed(2)} (Inc. ${(tierDiscountRate * 100)}% ${family.tier} Tier Discount)`;
+            document.getElementById('breakdown-discount').innerText = `- RM ${(tierDiscountAmount + voucherDiscount).toFixed(2)} (Inc. ${(tierDiscountRate * 100)}% ${family.tier} Tier + Voucher)`;
             document.getElementById('breakdown-net').innerText = `RM ${netAmount.toFixed(2)}`;
             document.getElementById('breakdown-stars').innerText = `+${starsCredited} ⭐`;
         }
@@ -405,29 +429,59 @@
             }
 
             const wsSelect = document.getElementById('pos-ws-select');
+            if (!wsSelect || wsSelect.options.length === 0) {
+                alert("Please create and select a workshop event first!");
+                return;
+            }
+
             const wsTitle = wsSelect.options[wsSelect.selectedIndex].text;
             const basePrice = parseFloat(document.getElementById('pos-original-price').value) || 120;
             const familyKey = student.family;
-            const family = window.appData.families[familyKey] || { tier: 'Prelude', stars: 100 };
+            const family = window.appData.families[familyKey] || { tier: 'Prelude', stars: 100, wallet: 0 };
 
             let tierDiscountRate = family.tier === 'Ensemble' ? 0.03 : family.tier === 'Crescendo' ? 0.05 : family.tier === 'Virtuoso' ? 0.10 : 0;
-            const netAmount = Math.max(0, basePrice - (basePrice * tierDiscountRate) - 50);
+            const tierDiscountAmount = basePrice * tierDiscountRate;
+            const voucherDiscount = window.appData.selectedVoucherDiscount;
+            const netAmount = Math.max(0, basePrice - tierDiscountAmount - voucherDiscount);
             const starsEarned = Math.round(netAmount * 2);
 
+            const currentWallet = Number(family.wallet || 0);
+            if (currentWallet < netAmount) {
+                alert(`Insufficient family wallet balance! Current wallet: RM ${currentWallet.toFixed(2)}, Net required: RM ${netAmount.toFixed(2)}. Please top up wallet first.`);
+                return;
+            }
+
+            const newWallet = currentWallet - netAmount;
             const newStars = Number(family.stars || 100) + starsEarned;
 
             try {
-                await setDoc(doc(db, "families", familyKey), { stars: newStars }, { merge: true });
+                // Perform atomic transaction update in Firestore
+                const famRef = doc(db, "families", familyKey);
+                await setDoc(famRef, { wallet: newWallet, stars: newStars }, { merge: true });
+
+                // If a voucher was used, mark it as redeemed
+                if (window.appData.selectedVoucherId) {
+                    await updateDoc(doc(db, "vouchers", window.appData.selectedVoucherId), { status: 'Redeemed' });
+                }
+
+                // Log transaction
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
                     student: student.name,
                     family: familyKey,
-                    desc: `POS Checkout: ${wsTitle}`,
-                    amount: `RM ${netAmount.toFixed(2)}`,
+                    desc: `POS Checkout: ${wsTitle} (Voucher: ${window.appData.selectedVoucherTitle})`,
+                    amount: `- RM ${netAmount.toFixed(2)}`,
                     starsChange: `+${starsEarned} ⭐`
                 });
 
-                alert(`Counter checkout successful for ${student.name}! Charged RM ${netAmount.toFixed(2)} and credited +${starsEarned} stars.`);
+                alert(`Counter checkout successful for ${student.name}! Deducted RM ${netAmount.toFixed(2)} from wallet and credited +${starsEarned} stars.`);
+                
+                // Reset voucher selection
+                window.appData.selectedVoucherId = null;
+                window.appData.selectedVoucherDiscount = 0;
+                window.appData.selectedVoucherTitle = "None";
+                updateAdminUI();
+
             } catch (err) {
                 console.error("Error completing POS checkout:", err);
                 alert("Error recording POS transaction.");
@@ -473,11 +527,9 @@
                 </div>
                 <div class="space-y-4 text-xs">
                     <div>
-                        <label class="block font-bold text-slate-600 mb-1">Select Workshop Event (Or Custom Fee)</label>
-                        <select id="pos-ws-select" onchange="calculatePosCheckout()" class="w-full p-3 border rounded-xl bg-white outline-none font-medium">
-                            <option value="120" data-price="120">Holiday Youth Recital Prep (RM 120.00)</option>
-                            <option value="150" data-price="150">Advanced Jazz Piano Masterclass (RM 150.00)</option>
-                            <option value="80" data-price="80">Beginner Music Theory Bootcamp (RM 80.00)</option>
+                        <label class="block font-bold text-slate-600 mb-1">Select Workshop Event (Synced with Database)</label>
+                        <select id="pos-ws-select" onchange="onWorkshopDropdownChange()" class="w-full p-3 border rounded-xl bg-white outline-none font-medium">
+                            <!-- Populated dynamically from workshops database -->
                         </select>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -486,16 +538,14 @@
                             <input type="number" id="pos-original-price" value="120" oninput="calculatePosCheckout()" class="w-full p-3 border rounded-xl outline-none font-bold">
                         </div>
                         <div>
-                            <label class="block font-bold text-slate-600 mb-1">Apply Parent Reward Voucher</label>
-                            <select id="pos-voucher-select" onchange="calculatePosCheckout()" class="w-full p-3 border rounded-xl bg-white outline-none font-medium">
-                                <option value="50">50% Off Workshop (-RM 50.00) [EX-4412]</option>
-                                <option value="20">RM 20 Cash Voucher [EX-9921]</option>
-                                <option value="0">None</option>
-                            </select>
+                            <label class="block font-bold text-slate-600 mb-1">Starbucks-Style Parent Vouchers (Live Claimed)</label>
+                            <div id="pos-vouchers-container" class="p-2 border rounded-xl bg-slate-50 min-h-[46px] max-h-36 overflow-y-auto space-y-2">
+                                <!-- Dynamically populated claimed vouchers for active family -->
+                            </div>
                         </div>
                     </div>
                     <button onclick="completePosCheckout()" class="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition text-sm flex justify-center items-center gap-2 shadow-lg">
-                        <span>✅</span> Confirm & Complete Counter Checkout
+                        <span>✅</span> Confirm & Complete Counter Checkout (Deduct Wallet)
                     </button>
                 </div>
             </div>
@@ -514,7 +564,7 @@
                         </div>
                         <div class="flex justify-between text-emerald-400">
                             <span>Discount Applied:</span>
-                            <span id="breakdown-discount" class="font-bold text-right">- RM 56.00 (Inc. 5% Tier Discount)</span>
+                            <span id="breakdown-discount" class="font-bold text-right">- RM 0.00</span>
                         </div>
                     </div>
                 </div>
@@ -522,11 +572,11 @@
                 <div class="space-y-4 pt-4 border-t border-slate-800">
                     <div class="flex justify-between items-baseline">
                         <span class="text-xs font-bold text-slate-300 uppercase">Net Amount To Collect:</span>
-                        <span id="breakdown-net" class="text-2xl font-extrabold text-amber-400">RM 64.00</span>
+                        <span id="breakdown-net" class="text-2xl font-extrabold text-amber-400">RM 0.00</span>
                     </div>
                     <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-1">
                         <p class="text-[10px] font-bold text-slate-400 uppercase">Stars Credited to Student:</p>
-                        <p id="breakdown-stars" class="text-lg font-extrabold text-amber-400">+128 ⭐</p>
+                        <p id="breakdown-stars" class="text-lg font-extrabold text-amber-400">+0 ⭐</p>
                         <p class="text-[10px] text-slate-400">Calculated at standard rate (RM1 = 2⭐)</p>
                     </div>
                 </div>
@@ -649,7 +699,7 @@
         function updateAdminUI() {
             const data = window.appData;
 
-            // Update POS Student Selector Dropdown
+            // 1. Update POS Student Selector Dropdown
             const posSelector = document.getElementById('pos-student-selector');
             if (posSelector) {
                 if (data.students.length === 0) {
@@ -658,13 +708,57 @@
                     posSelector.innerHTML = data.students.map(s => {
                         const fam = data.families[s.family] || { tier: 'Prelude', stars: 100, wallet: 0 };
                         const selected = s.id === data.activePosStudentId ? 'selected' : '';
-                        return `<option value="${s.id}" ${selected}>${s.name} [${fam.tier}] (${fam.stars || 100} ⭐)</option>`;
+                        return `<option value="${s.id}" ${selected}>${s.name} [${fam.tier}] (Wallet: RM ${Number(fam.wallet || 0).toFixed(2)})</option>`;
                     }).join('');
                 }
             }
+
+            // 2. Synchronize POS Workshop Dropdown with Database Workshops
+            const wsSelect = document.getElementById('pos-ws-select');
+            if (wsSelect) {
+                const currentSelectedWsVal = wsSelect.value;
+                if (data.workshops.length === 0) {
+                    wsSelect.innerHTML = `<option value="" data-price="0">No workshops scheduled</option>`;
+                } else {
+                    wsSelect.innerHTML = data.workshops.map(w => {
+                        return `<option value="${w.id}" data-price="${w.price}">${w.title} (RM ${w.price.toFixed(2)} - ${w.date})</option>`;
+                    }).join('');
+                    if (currentSelectedWsVal) wsSelect.value = currentSelectedWsVal;
+                }
+            }
+
+            // 3. Render Starbucks-style claimed vouchers for the selected student's family
+            const vouchersContainer = document.getElementById('pos-vouchers-container');
+            if (vouchersContainer) {
+                const activeStudent = data.students.find(s => s.id === data.activePosStudentId);
+                const familyKey = activeStudent ? activeStudent.family : null;
+                
+                // Filter vouchers claimed by this specific family and status is 'Approved & Available'
+                const familyVouchers = data.vouchers.filter(v => v.family === familyKey && v.status === 'Approved & Available');
+
+                if (familyVouchers.length === 0) {
+                    vouchersContainer.innerHTML = `<p class="text-slate-400 italic p-1">No active parent vouchers available for this family.</p>`;
+                } else {
+                    vouchersContainer.innerHTML = familyVouchers.map(v => {
+                        const isSelected = window.appData.selectedVoucherId === v.id;
+                        return `
+                            <div class="flex justify-between items-center p-2 bg-white border rounded-lg ${isSelected ? 'border-indigo-600 bg-indigo-50/50' : ''}">
+                                <div>
+                                    <p class="font-bold text-slate-800">${v.title} <span class="text-emerald-600 font-bold">(RM ${v.discountValue || 50} Off)</span></p>
+                                    <p class="text-[10px] text-slate-500">ID: ${v.id.substring(0, 8)}...</p>
+                                </div>
+                                <button type="button" onclick="selectPosVoucher('${v.id}', '${v.title}', ${v.discountValue || 50})" class="px-3 py-1 ${isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-white hover:bg-slate-800'} font-bold rounded-md transition text-[11px]">
+                                    ${isSelected ? '✓ Applied' : 'Apply Voucher'}
+                                </button>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+
             calculatePosCheckout();
 
-            // Update Students Tab List
+            // 4. Update Students Tab List
             const studentsContainer = document.getElementById('admin-students-list');
             const uniqueFamilies = [...new Set(data.students.map(s => s.family))];
 
@@ -707,7 +801,7 @@
                 }).join('');
             }
 
-            // Update Workshops Tab List
+            // 5. Update Workshops Tab List
             const wsContainer = document.getElementById('admin-workshops-list');
             wsContainer.innerHTML = data.workshops.length === 0 ? `<p class="text-slate-400 italic">No workshops scheduled.</p>` :
                 data.workshops.map(w => `
@@ -717,7 +811,6 @@
                                 <span class="ml-2 px-2 py-0.5 rounded text-[10px] font-bold ${w.status === 'Closed' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}">${w.status || 'Open'}</span>
                             </h4>
                             <p class="text-slate-500">Date: ${w.date} | Time: ${w.time || 'TBD'} | Teacher: ${w.teacher || 'TBD'} | Price: RM ${w.price}</p>
-                            <p class="text-slate-600 mt-1">Registered: <span class="font-semibold">${(w.registered || []).join(', ') || 'None yet'}</span></p>
                         </div>
                         <div class="flex flex-wrap gap-1.5">
                             <button onclick="toggleWorkshopStatus('${w.id}', '${w.status || 'Open'}')" class="px-3 py-1.5 ${w.status === 'Closed' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'} text-white font-bold rounded-lg transition">${w.status === 'Closed' ? 'Open Reg' : 'Close Reg'}</button>
@@ -727,21 +820,21 @@
                     </div>
                 `).join('');
 
-            // Update Vouchers Tab List
+            // 6. Update Vouchers Tab List (Pending Claims)
             const vContainer = document.getElementById('admin-vouchers-list');
             const pendingVouchers = data.vouchers.filter(v => v.status === 'Pending Verification');
             vContainer.innerHTML = pendingVouchers.length === 0 ? `<p class="text-slate-400 italic">No pending voucher claims.</p>` :
                 pendingVouchers.map(v => `
                     <div class="bg-slate-50 p-4 rounded-xl border flex justify-between items-center">
                         <div>
-                            <h4 class="font-bold text-slate-800">${v.title}</h4>
-                            <p class="text-slate-500">Claimed by: <span class="font-semibold text-slate-700">${v.claimedBy}</span> (Family: ${v.family}) | Cost: <span class="text-amber-600 font-bold">${v.cost} Stars</span></p>
+                            <h4 class="font-bold text-slate-800">${v.title} (Value: RM ${v.discountValue || 50})</h4>
+                            <p class="text-slate-500">Claimed by Family: <span class="font-semibold text-slate-700">${v.family}</span> | Cost: <span class="text-amber-600 font-bold">${v.cost || 50} Stars</span></p>
                         </div>
                         <button onclick="approveVoucher('${v.id}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition">Approve Claim</button>
                     </div>
                 `).join('');
 
-            // Update Transactions Tab List
+            // 7. Update Transactions Tab List
             const txContainer = document.getElementById('admin-transactions-list');
             txContainer.innerHTML = data.transactions.length === 0 ? `<p class="text-slate-400 italic">No transactions recorded.</p>` :
                 data.transactions.map(t => `
