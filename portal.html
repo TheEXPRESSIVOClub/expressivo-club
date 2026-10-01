@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, doc, updateDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { initializeFirestore, collection, doc, updateDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHvyRDPEG9jzFbqSTuKmTjvnRDShmN6uU",
@@ -19,7 +19,9 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        const db = initializeFirestore(app, {
+            experimentalAutoDetectLongPolling: true
+        });
 
         window.db = db;
         window.portalData = { student: null, family: null, siblings: [], workshops: [], transactions: [] };
@@ -41,8 +43,10 @@
 
                 let found = null;
                 if (studentParam) {
-                    found = students.find(s => s.name.toLowerCase() === decodeURIComponent(studentParam).toLowerCase());
+                    const decodedParam = decodeURIComponent(studentParam).trim().toLowerCase();
+                    found = students.find(s => s.name && s.name.trim().toLowerCase() === decodedParam);
                 }
+                
                 if (!found) {
                     found = students[0];
                 }
@@ -52,7 +56,11 @@
                     window.portalData.siblings = students.filter(s => s.family === found.family);
 
                     onSnapshot(doc(db, "families", found.family), (famSnap) => {
-                        window.portalData.family = famSnap.exists() ? famSnap.data() : { wallet: 0, stars: 100, tier: 'Prelude' };
+                        if (famSnap.exists()) {
+                            window.portalData.family = famSnap.data();
+                        } else {
+                            window.portalData.family = { wallet: 0, stars: 100, tier: 'Prelude' };
+                        }
                         updatePortalUI();
                     });
                 }
@@ -126,23 +134,27 @@
                 return;
             }
 
+            // Calculate stars reward: RM2 = 1 star (price divided by 2, rounded down)
+            const workshopPrice = parseFloat(ws.price) || 0;
+            const starsEarned = Math.floor(workshopPrice / 2);
+
             try {
                 registeredList.push(data.student.name);
                 await updateDoc(doc(db, "workshops", wId), { registered: registeredList });
 
                 const currentStars = data.family?.stars ?? 100;
-                await updateDoc(doc(db, "families", data.student.family), { stars: currentStars + 15 });
+                await updateDoc(doc(db, "families", data.student.family), { stars: currentStars + starsEarned });
 
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
                     student: data.student.name,
                     family: data.student.family,
                     desc: `Registered for Workshop: ${ws.title}`,
-                    amount: `- RM ${Number(ws.price).toFixed(2)}`,
-                    starsChange: '+15 ⭐'
+                    amount: `- RM ${workshopPrice.toFixed(2)}`,
+                    starsChange: `+${starsEarned} ⭐`
                 });
 
-                alert(`Registered successfully for ${ws.title}! (+15 Stars earned)`);
+                alert(`Registered successfully for ${ws.title}! (+${starsEarned} Stars earned at RM2 = 1 star)`);
             } catch (err) {
                 console.error("Error registering workshop: ", err);
             }
@@ -183,12 +195,13 @@
                 `<p class="text-slate-400 italic text-xs">No upcoming workshops scheduled.</p>` :
                 data.workshops.map(w => {
                     const isReg = data.student && (w.registered || []).includes(data.student.name);
+                    const calculatedStars = Math.floor((parseFloat(w.price) || 0) / 2);
                     return `
                         <div class="bg-slate-50 p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
                             <div>
                                 <h4 class="font-bold text-slate-800 text-sm">${w.title} ${w.exclusive ? '<span class="text-amber-600 font-semibold">⭐ Exclusive</span>' : ''}</h4>
                                 <p class="text-slate-500 mt-0.5">📅 Date: ${w.date} | ⏰ Time: ${w.time || 'TBD'} | 👨‍🏫 Teacher: ${w.teacher || 'TBD'}</p>
-                                <p class="text-slate-600 font-semibold mt-0.5">Price: RM ${w.price}</p>
+                                <p class="text-slate-600 font-semibold mt-0.5">Price: RM ${w.price} <span class="text-amber-600 font-bold ml-2">(Earns +${calculatedStars} ⭐)</span></p>
                             </div>
                             <div>
                                 ${isReg ? `<span class="px-3 py-1.5 bg-emerald-100 text-emerald-700 font-bold rounded-lg block text-center">Registered ✓</span>` :
@@ -229,7 +242,7 @@
             const fam = data.family || { wallet: 0, stars: 100, tier: 'Prelude' };
 
             document.getElementById('header-student-title').innerText = `🎹 Family Portal`;
-            document.getElementById('header-student-subtitle').innerText = `Student: ${data.student.name} | Contact: ${data.student.contact}`;
+            document.getElementById('header-student-subtitle').innerText = `Student: ${data.student.name} | Family ID: ${data.student.family} | Contact: ${data.student.contact}`;
             document.getElementById('header-stars').innerText = `${fam.stars ?? 100} ⭐`;
             document.getElementById('header-tier').innerText = `${fam.tier || 'Prelude'} Tier`;
             document.getElementById('family-wallet-balance').innerText = `RM ${Number(fam.wallet || 0).toFixed(2)}`;
