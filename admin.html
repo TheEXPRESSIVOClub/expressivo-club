@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, doc, getDocs, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHvyRDPEG9jzFbqSTuKmTjvnRDShmN6uU",
@@ -19,7 +19,9 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        const db = initializeFirestore(app, {
+            experimentalAutoDetectLongPolling: true
+        });
 
         window.db = db;
         window.appData = { students: [], families: {}, workshops: [], vouchers: [], transactions: [] };
@@ -68,6 +70,37 @@
 
         initFirestoreListeners();
 
+        window.exportStudentsToExcel = function() {
+            const data = window.appData;
+            if (!data.students || data.students.length === 0) {
+                alert("No students to export!");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,Student Name,Family ID,Contact Number,Membership Tier,Wallet Balance (RM),Stars\r\n";
+
+            data.students.forEach(s => {
+                const fam = data.families[s.family] || { wallet: 0, stars: 100, tier: 'Prelude' };
+                const row = [
+                    `"${s.name || ''}"`,
+                    `"${s.family || ''}"`,
+                    `"${s.contact || ''}"`,
+                    `"${fam.tier || 'Prelude'}"`,
+                    `"${Number(fam.wallet || 0).toFixed(2)}"`,
+                    `"${fam.stars || 100}"`
+                ];
+                csvContent += row.join(",") + "\r\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "Expressivo_Club_Students.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
         window.handleAddNewStudent = async function(e) {
             e.preventDefault();
             const name = document.getElementById('new-student-name').value.trim();
@@ -77,14 +110,14 @@
             const wallet = parseFloat(document.getElementById('new-family-wallet').value) || 0;
 
             try {
-                await addDoc(collection(db, "students"), { name, family: familyId, contact, dob: '2016-01-01' });
-
                 const famRef = doc(db, "families", familyId);
                 await setDoc(famRef, {
                     wallet: wallet,
-                    stars: 100, // Automatic 100 stars welcome bonus
+                    stars: 100,
                     tier: tier
                 }, { merge: true });
+
+                await addDoc(collection(db, "students"), { name, family: familyId, contact, dob: '2016-01-01' });
 
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
@@ -95,7 +128,7 @@
                     starsChange: '+100 ⭐ (Welcome Bonus)'
                 });
 
-                alert(`Student "${name}" registered successfully with 100 welcome stars!`);
+                alert(`Student "${name}" registered successfully with Tier: ${tier} & 100 welcome stars!`);
                 e.target.reset();
             } catch (err) {
                 console.error("Error adding student: ", err);
@@ -276,10 +309,10 @@
                         <div>
                             <label class="block font-bold text-slate-600 mb-1">Membership Tier</label>
                             <select id="new-family-tier" class="w-full p-2.5 border rounded-xl bg-white outline-none">
-                                <option value="Prelude">Prelude </option>
-                                <option value="Ensemble">Ensemble </option>
-                                <option value="Crescendo">Crescendo </option>
-                                <option value="Virtuoso">Virtuoso </option>
+                                <option value="Prelude">Prelude (Basic)</option>
+                                <option value="Ensemble">Ensemble (Silver)</option>
+                                <option value="Crescendo">Crescendo (Gold)</option>
+                                <option value="Virtuoso">Virtuoso (Platinum)</option>
                             </select>
                         </div>
                         <div>
@@ -291,7 +324,10 @@
                 </div>
 
                 <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                    <h2 class="text-base font-bold text-slate-800 border-b pb-3">👥 Active Cloud Student Directory</h2>
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-3 gap-2">
+                        <h2 class="text-base font-bold text-slate-800">👥 Active Cloud Student Directory</h2>
+                        <button onclick="exportStudentsToExcel()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition">📥 Export to Excel (CSV)</button>
+                    </div>
                     <div id="admin-students-list" class="space-y-3 text-xs"></div>
                 </div>
             </div>
@@ -383,7 +419,7 @@
                             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-2">
                                 <div>
                                     <h3 class="font-bold text-slate-800">Family Group: <span class="text-indigo-600">${famKey}</span></h3>
-                                    <p class="text-slate-500">Tier: <span class="font-semibold text-slate-700">${famWallet.tier}</span> | Wallet: <span class="font-bold text-emerald-600">RM ${Number(famWallet.wallet).toFixed(2)}</span> | Stars: <span class="font-bold text-amber-600">${famWallet.stars || 100} ⭐</span></p>
+                                    <p class="text-slate-500">Tier: <span class="font-semibold text-slate-700">${famWallet.tier}</span> | Wallet: <span class="font-bold text-emerald-600">RM ${Number(famWallet.wallet || 0).toFixed(2)}</span> | Stars: <span class="font-bold text-amber-600">${famWallet.stars || 100} ⭐</span></p>
                                 </div>
                                 <div class="flex flex-wrap gap-2">
                                     <button onclick="addReferralStarsWithRemark('${famKey}')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg transition">+ Ref ⭐ (Friend Name)</button>
