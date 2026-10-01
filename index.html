@@ -820,7 +820,7 @@
                                     <p class="font-bold text-slate-800">${v.title} <span class="text-emerald-600 font-bold">(RM ${v.discountValue || 50} Off)</span></p>
                                     <p class="text-[10px] text-slate-500">ID: ${v.id.substring(0, 8)}...</p>
                                 </div>
-                                <button type="button" onclick="selectPosVoucher('${v.id}', '${v.title}', ${v.discountValue || 50})" class="px-3 py-1 ${isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-white hover:bg-slate-800'} font-bold rounded-md transition text-[11px]">
+                                <button type="button" onclick="selectPosVoucher('${v.id}', '${v.title}', ${v.discountValue || 5})" class="px-3 py-1 ${isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-white hover:bg-slate-800'} font-bold rounded-md transition text-[11px]">
                                     ${isSelected ? '✓ Applied' : 'Apply Voucher'}
                                 </button>
                             </div>
