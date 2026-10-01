@@ -33,6 +33,8 @@
                     window.appData.families[docSnap.id] = docSnap.data();
                 });
                 updateAdminUI();
+            }, (error) => {
+                console.error("Error listening to families collection:", error);
             });
 
             onSnapshot(collection(db, "students"), (snapshot) => {
@@ -41,6 +43,8 @@
                     window.appData.students.push({ id: docSnap.id, ...docSnap.data() });
                 });
                 updateAdminUI();
+            }, (error) => {
+                console.error("Error listening to students collection:", error);
             });
 
             onSnapshot(collection(db, "workshops"), (snapshot) => {
@@ -49,6 +53,8 @@
                     window.appData.workshops.push({ id: docSnap.id, ...docSnap.data() });
                 });
                 updateAdminUI();
+            }, (error) => {
+                console.error("Error listening to workshops collection:", error);
             });
 
             onSnapshot(collection(db, "vouchers"), (snapshot) => {
@@ -57,6 +63,8 @@
                     window.appData.vouchers.push({ id: docSnap.id, ...docSnap.data() });
                 });
                 updateAdminUI();
+            }, (error) => {
+                console.error("Error listening to vouchers collection:", error);
             });
 
             onSnapshot(collection(db, "transactions"), (snapshot) => {
@@ -65,6 +73,8 @@
                     window.appData.transactions.push({ id: docSnap.id, ...docSnap.data() });
                 });
                 updateAdminUI();
+            }, (error) => {
+                console.error("Error listening to transactions collection:", error);
             });
         }
 
@@ -137,8 +147,8 @@
                 alert(`Student "${name}" registered successfully with Tier: ${tier} & 100 welcome stars!`);
                 e.target.reset();
             } catch (err) {
-                console.error("Error adding student: ", err);
-                alert("Error saving to database.");
+                console.error("Error adding student to Cloud Firestore: ", err);
+                alert("Error saving to database. Check your browser Console (F12) and ensure your Firestore Rules allow write access!");
             }
         }
 
@@ -299,7 +309,7 @@
             if (isNaN(amount)) return;
 
             const fam = window.appData.families[familyKey] || { wallet: 0 };
-            const newTotal = fam.wallet + amount;
+            const newTotal = (fam.wallet || 0) + amount;
 
             try {
                 await setDoc(doc(db, "families", familyKey), { wallet: newTotal }, { merge: true });
@@ -356,10 +366,10 @@
                         <div>
                             <label class="block font-bold text-slate-600 mb-1">Membership Tier</label>
                             <select id="new-family-tier" class="w-full p-2.5 border rounded-xl bg-white outline-none">
-                                <option value="Prelude">Prelude </option>
-                                <option value="Ensemble">Ensemble </option>
-                                <option value="Crescendo">Crescendo </option>
-                                <option value="Virtuoso">Virtuoso </option>
+                                <option value="Prelude">Prelude (Basic)</option>
+                                <option value="Ensemble">Ensemble (Silver)</option>
+                                <option value="Crescendo">Crescendo (Gold)</option>
+                                <option value="Virtuoso">Virtuoso (Platinum)</option>
                             </select>
                         </div>
                         <div>
