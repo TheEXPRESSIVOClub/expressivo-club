@@ -404,8 +404,7 @@
             const family = familyKey ? (window.appData.families[familyKey] || { tier: 'Prelude', stars: 100, wallet: 0 }) : { tier: 'Prelude', stars: 100, wallet: 0 };
 
             let tierDiscountRate = 0;
-            if (family.tier === 'Ensemble') tierDiscountRate = 0.03;
-            else if (family.tier === 'Crescendo') tierDiscountRate = 0.05;
+            if (family.tier === 'Crescendo') tierDiscountRate = 0.05;
             else if (family.tier === 'Virtuoso') tierDiscountRate = 0.10;
 
             const tierDiscountAmount = basePrice * tierDiscountRate;
