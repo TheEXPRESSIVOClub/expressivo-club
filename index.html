@@ -303,7 +303,7 @@
         }
 
         window.adjustWallet = async function(familyKey) {
-            const amountStr = prompt('Enter amount to add (positive) or deduct (negative) for family wallet:', '50');
+            const amountStr = prompt('Enter amount to add (positive) or top-up for family wallet:', '50');
             if (amountStr === null) return;
             const amount = parseFloat(amountStr);
             if (isNaN(amount)) return;
@@ -317,45 +317,13 @@
                     date: new Date().toISOString().split('T')[0],
                     student: 'Family Admin',
                     family: familyKey,
-                    desc: 'Admin manual wallet adjustment',
+                    desc: 'Admin wallet top-up / adjustment',
                     amount: `${amount >= 0 ? '+' : ''} RM ${amount.toFixed(2)}`,
                     starsChange: '0 ⭐'
                 });
                 alert('Wallet updated!');
             } catch (err) {
                 console.error("Error updating wallet:", err);
-            }
-        }
-
-        window.deductWallet = async function(familyKey) {
-            const amountStr = prompt('Enter amount to deduct from family wallet (RM):', '50.00');
-            if (amountStr === null) return;
-            const amount = parseFloat(amountStr);
-            if (isNaN(amount) || amount <= 0) {
-                alert('Please enter a valid positive amount.');
-                return;
-            }
-
-            const reason = prompt('Enter reason for wallet deduction (e.g., Material fee):', 'Admin wallet deduction');
-            if (reason === null) return;
-
-            const fam = window.appData.families[familyKey] || { wallet: 0 };
-            const currentWallet = Number(fam.wallet || 0);
-            const newTotal = currentWallet - amount;
-
-            try {
-                await setDoc(doc(db, "families", familyKey), { wallet: newTotal }, { merge: true });
-                await addDoc(collection(db, "transactions"), {
-                    date: new Date().toISOString().split('T')[0],
-                    student: 'Family Admin',
-                    family: familyKey,
-                    desc: `Wallet Deduction: ${reason}`,
-                    amount: `- RM ${amount.toFixed(2)}`,
-                    starsChange: '0 ⭐'
-                });
-                alert(`Successfully deducted RM ${amount.toFixed(2)} from family wallet!`);
-            } catch (err) {
-                console.error("Error deducting wallet:", err);
             }
         }
 
@@ -577,7 +545,7 @@
                             <input type="number" id="pos-original-price" value="120" oninput="calculatePosCheckout()" class="w-full p-3 border rounded-xl outline-none font-bold">
                         </div>
                         <div>
-                            <label class="block font-bold text-slate-600 mb-1">Starbucks-Style Parent Vouchers (Live Claimed)</label>
+                            <label class="block font-bold text-slate-600 mb-1">Claimed Parent Vouchers</label>
                             <div id="pos-vouchers-container" class="p-2 border rounded-xl bg-slate-50 min-h-[46px] max-h-36 overflow-y-auto space-y-2">
                                 <!-- Dynamically populated claimed vouchers -->
                             </div>
@@ -770,7 +738,7 @@
                 }
             }
 
-            // 3. Render Starbucks-style claimed vouchers for the selected student's family
+            // 3. Render claimed vouchers for the selected student's family
             const vouchersContainer = document.getElementById('pos-vouchers-container');
             if (vouchersContainer) {
                 const familyKey = activeStudent ? activeStudent.family : null;
@@ -820,8 +788,7 @@
                                 <div class="flex flex-wrap gap-2">
                                     <button onclick="addReferralStarsWithRemark('${famKey}')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg transition">+ Ref ⭐ (Friend Name)</button>
                                     <button onclick="adjustManualStars('${famKey}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition">± Manual Stars</button>
-                                    <button onclick="adjustWallet('${famKey}')" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition">Adjust Wallet</button>
-                                    <button onclick="deductWallet('${famKey}')" class="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold rounded-lg transition">Deduct Wallet</button>
+                                    <button onclick="adjustWallet('${famKey}')" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition">Top-Up Wallet</button>
                                     <button onclick="openParentPortal('${studentName}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition">Open Portal ↗</button>
                                 </div>
                             </div>
