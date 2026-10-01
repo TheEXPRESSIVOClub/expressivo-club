@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHvyRDPEG9jzFbqSTuKmTjvnRDShmN6uU",
@@ -43,8 +43,6 @@
                     window.appData.families[docSnap.id] = docSnap.data();
                 });
                 updateAdminUI();
-            }, (error) => {
-                console.error("Error listening to families collection:", error);
             });
 
             onSnapshot(collection(db, "students"), (snapshot) => {
@@ -56,8 +54,6 @@
                     window.appData.activePosStudentId = window.appData.students[0].id;
                 }
                 updateAdminUI();
-            }, (error) => {
-                console.error("Error listening to students collection:", error);
             });
 
             onSnapshot(collection(db, "workshops"), (snapshot) => {
@@ -66,8 +62,6 @@
                     window.appData.workshops.push({ id: docSnap.id, ...docSnap.data() });
                 });
                 updateAdminUI();
-            }, (error) => {
-                console.error("Error listening to workshops collection:", error);
             });
 
             onSnapshot(collection(db, "vouchers"), (snapshot) => {
@@ -76,8 +70,6 @@
                     window.appData.vouchers.push({ id: docSnap.id, ...docSnap.data() });
                 });
                 updateAdminUI();
-            }, (error) => {
-                console.error("Error listening to vouchers collection:", error);
             });
 
             onSnapshot(collection(db, "transactions"), (snapshot) => {
@@ -86,15 +78,13 @@
                     window.appData.transactions.push({ id: docSnap.id, ...docSnap.data() });
                 });
                 updateAdminUI();
-            }, (error) => {
-                console.error("Error listening to transactions collection:", error);
             });
         }
 
         initFirestoreListeners();
 
         window.openParentPortal = function(studentName) {
-            const baseUrl = "https://theexpressivoclub.github.io/expressivo-club/";
+            const baseUrl = "https://theexpressivoclub.github.io/expressivo-club/portal.html";
             const targetUrl = `${baseUrl}?student=${encodeURIComponent(studentName)}`;
             window.open(targetUrl, '_blank');
         };
@@ -157,11 +147,11 @@
                     starsChange: '+100 ⭐ (Welcome Bonus)'
                 });
 
-                alert(`Student "${name}" registered successfully with Tier: ${tier} & 100 welcome stars!`);
+                alert(`Student "${name}" registered successfully!`);
                 e.target.reset();
             } catch (err) {
-                console.error("Error adding student to Cloud Firestore: ", err);
-                alert("Error saving to database. Check your browser Console (F12).");
+                console.error("Error adding student: ", err);
+                alert("Error saving to database.");
             }
         }
 
@@ -206,10 +196,9 @@
                     starsChange: `+${starsToAdd} ⭐`
                 });
 
-                alert(`Successfully added ${starsToAdd} referral stars to family "${familyKey}"!`);
+                alert(`Successfully added ${starsToAdd} referral stars!`);
             } catch (err) {
                 console.error("Error adding referral stars:", err);
-                alert("Error updating referral stars.");
             }
         }
 
@@ -370,11 +359,52 @@
             }
         }
 
-        window.changePosStudent = function(studentId) {
+        window.filterPosStudents = function() {
+            const searchVal = document.getElementById('pos-student-search').value.toLowerCase();
+            const resultsContainer = document.getElementById('pos-student-search-results');
+            if (!resultsContainer) return;
+
+            if (!searchVal.trim()) {
+                resultsContainer.classList.add('hidden');
+                return;
+            }
+
+            const matched = window.appData.students.filter(s => 
+                s.name.toLowerCase().includes(searchVal) || 
+                s.family.toLowerCase().includes(searchVal) ||
+                (s.contact && s.contact.includes(searchVal))
+            );
+
+            if (matched.length === 0) {
+                resultsContainer.innerHTML = `<div class="p-2 text-slate-400 text-xs italic">No matching students found</div>`;
+            } else {
+                resultsContainer.innerHTML = matched.map(s => {
+                    const fam = window.appData.families[s.family] || { tier: 'Prelude', wallet: 0 };
+                    return `
+                        <div onclick="selectPosStudent('${s.id}', '${s.name}')" class="p-2 hover:bg-indigo-50 cursor-pointer border-b last:border-b-0 text-xs flex justify-between items-center">
+                            <div>
+                                <span class="font-bold text-slate-800">${s.name}</span> <span class="text-slate-500">[Family: ${s.family}]</span>
+                            </div>
+                            <span class="text-emerald-600 font-bold">Wallet: RM ${Number(fam.wallet || 0).toFixed(2)} (${fam.tier})</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+            resultsContainer.classList.remove('hidden');
+        }
+
+        window.selectPosStudent = function(studentId, studentName) {
             window.appData.activePosStudentId = studentId;
             window.appData.selectedVoucherId = null;
             window.appData.selectedVoucherDiscount = 0;
             window.appData.selectedVoucherTitle = "None";
+
+            const searchInput = document.getElementById('pos-student-search');
+            if (searchInput) searchInput.value = studentName;
+            
+            const resultsContainer = document.getElementById('pos-student-search-results');
+            if (resultsContainer) resultsContainer.classList.add('hidden');
+
             updateAdminUI();
         }
 
@@ -424,7 +454,7 @@
         window.completePosCheckout = async function() {
             const student = window.appData.students.find(s => s.id === window.appData.activePosStudentId);
             if (!student) {
-                alert("Please select a target student first!");
+                alert("Please select a target student first using the search bar!");
                 return;
             }
 
@@ -455,16 +485,13 @@
             const newStars = Number(family.stars || 100) + starsEarned;
 
             try {
-                // Perform atomic transaction update in Firestore
                 const famRef = doc(db, "families", familyKey);
                 await setDoc(famRef, { wallet: newWallet, stars: newStars }, { merge: true });
 
-                // If a voucher was used, mark it as redeemed
                 if (window.appData.selectedVoucherId) {
                     await updateDoc(doc(db, "vouchers", window.appData.selectedVoucherId), { status: 'Redeemed' });
                 }
 
-                // Log transaction
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
                     student: student.name,
@@ -476,7 +503,6 @@
 
                 alert(`Counter checkout successful for ${student.name}! Deducted RM ${netAmount.toFixed(2)} from wallet and credited +${starsEarned} stars.`);
                 
-                // Reset voucher selection
                 window.appData.selectedVoucherId = null;
                 window.appData.selectedVoucherDiscount = 0;
                 window.appData.selectedVoucherTitle = "None";
@@ -492,7 +518,7 @@
 <body class="bg-slate-100 text-slate-800 font-sans p-4 sm:p-6">
 
     <div class="max-w-6xl mx-auto space-y-6">
-        <!-- TOP BANNER WITH TARGET STUDENT SELECTOR -->
+        <!-- TOP HEADER -->
         <header class="bg-slate-900 text-white p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
                 <div class="flex items-center gap-2 mb-1">
@@ -501,11 +527,8 @@
                 </div>
                 <h1 class="text-xl sm:text-2xl font-bold">Counter POS & Student Service Desk</h1>
             </div>
-            <div class="bg-slate-800 border border-slate-700 px-4 py-2.5 rounded-xl flex items-center gap-3">
-                <span class="text-xs font-bold text-slate-400 whitespace-nowrap">Target Student:</span>
-                <select id="pos-student-selector" onchange="changePosStudent(this.value)" class="bg-slate-900 text-amber-400 font-bold text-xs p-2 rounded-lg border border-slate-700 outline-none cursor-pointer">
-                    <!-- Populated dynamically -->
-                </select>
+            <div class="text-xs text-slate-300 bg-slate-800 px-4 py-2.5 rounded-xl border border-slate-700">
+                <span>⚡ System Status: Connected to Cloud Firestore</span>
             </div>
         </header>
 
@@ -526,12 +549,28 @@
                     <h2 class="text-base font-bold text-slate-800">Counter Workshop Purchase & Billing</h2>
                 </div>
                 <div class="space-y-4 text-xs">
+                    
+                    <!-- SEARCHABLE STUDENT SELECTOR AT THE TOP OF POS -->
+                    <div class="relative">
+                        <label class="block font-bold text-slate-600 mb-1">Find & Select Target Student (Search by name or family)</label>
+                        <input type="text" id="pos-student-search" oninput="filterPosStudents()" placeholder="🔍 Type student name (e.g. Chloe Tan)..." class="w-full p-3 border rounded-xl outline-none font-medium bg-slate-50">
+                        <div id="pos-student-search-results" class="absolute z-10 w-full bg-white border rounded-xl shadow-lg mt-1 max-h-48 overflow-y-auto hidden">
+                            <!-- Dynamically populated search matches -->
+                        </div>
+                    </div>
+
+                    <!-- SELECTED STUDENT BADGE PREVIEW -->
+                    <div id="active-student-badge" class="p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex justify-between items-center text-xs">
+                        <!-- Populated by JS -->
+                    </div>
+
                     <div>
                         <label class="block font-bold text-slate-600 mb-1">Select Workshop Event (Synced with Database)</label>
                         <select id="pos-ws-select" onchange="onWorkshopDropdownChange()" class="w-full p-3 border rounded-xl bg-white outline-none font-medium">
-                            <!-- Populated dynamically from workshops database -->
+                            <!-- Populated dynamically -->
                         </select>
                     </div>
+
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block font-bold text-slate-600 mb-1">Original Price (RM)</label>
@@ -540,7 +579,7 @@
                         <div>
                             <label class="block font-bold text-slate-600 mb-1">Starbucks-Style Parent Vouchers (Live Claimed)</label>
                             <div id="pos-vouchers-container" class="p-2 border rounded-xl bg-slate-50 min-h-[46px] max-h-36 overflow-y-auto space-y-2">
-                                <!-- Dynamically populated claimed vouchers for active family -->
+                                <!-- Dynamically populated claimed vouchers -->
                             </div>
                         </div>
                     </div>
@@ -699,18 +738,22 @@
         function updateAdminUI() {
             const data = window.appData;
 
-            // 1. Update POS Student Selector Dropdown
-            const posSelector = document.getElementById('pos-student-selector');
-            if (posSelector) {
-                if (data.students.length === 0) {
-                    posSelector.innerHTML = `<option value="">No students available</option>`;
-                } else {
-                    posSelector.innerHTML = data.students.map(s => {
-                        const fam = data.families[s.family] || { tier: 'Prelude', stars: 100, wallet: 0 };
-                        const selected = s.id === data.activePosStudentId ? 'selected' : '';
-                        return `<option value="${s.id}" ${selected}>${s.name} [${fam.tier}] (Wallet: RM ${Number(fam.wallet || 0).toFixed(2)})</option>`;
-                    }).join('');
-                }
+            // 1. Update Active Student Badge in POS
+            const activeStudent = data.students.find(s => s.id === data.activePosStudentId) || data.students[0];
+            const activeBadge = document.getElementById('active-student-badge');
+            if (activeBadge && activeStudent) {
+                const fam = data.families[activeStudent.family] || { tier: 'Prelude', stars: 100, wallet: 0 };
+                activeBadge.innerHTML = `
+                    <div>
+                        <span class="font-bold text-indigo-900">Active POS Student:</span> <span class="font-extrabold text-slate-900">${activeStudent.name}</span> 
+                        <span class="text-slate-600 ml-2">(Family: ${activeStudent.family} | Tier: <span class="text-indigo-600 font-bold">${fam.tier}</span>)</span>
+                    </div>
+                    <div class="font-bold text-emerald-600">
+                        Wallet: RM ${Number(fam.wallet || 0).toFixed(2)} | Stars: ${fam.stars || 100} ⭐
+                    </div>
+                `;
+            } else if (activeBadge) {
+                activeBadge.innerHTML = `<span class="text-slate-400 italic">No student selected. Use the search bar above.</span>`;
             }
 
             // 2. Synchronize POS Workshop Dropdown with Database Workshops
@@ -730,10 +773,7 @@
             // 3. Render Starbucks-style claimed vouchers for the selected student's family
             const vouchersContainer = document.getElementById('pos-vouchers-container');
             if (vouchersContainer) {
-                const activeStudent = data.students.find(s => s.id === data.activePosStudentId);
                 const familyKey = activeStudent ? activeStudent.family : null;
-                
-                // Filter vouchers claimed by this specific family and status is 'Approved & Available'
                 const familyVouchers = data.vouchers.filter(v => v.family === familyKey && v.status === 'Approved & Available');
 
                 if (familyVouchers.length === 0) {
