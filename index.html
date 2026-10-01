@@ -401,7 +401,7 @@
 
             const student = window.appData.students.find(s => s.id === window.appData.activePosStudentId);
             const familyKey = student ? student.family : null;
-            const family = familyKey ? (window.appData.families[familyKey] || { tier: 'Prelude', stars: 100 }) : { tier: 'Prelude', stars: 100 };
+            const family = familyKey ? (window.appData.families[familyKey] || { tier: 'Prelude', stars: 100, wallet: 0 }) : { tier: 'Prelude', stars: 100, wallet: 0 };
 
             let tierDiscountRate = 0;
             if (family.tier === 'Ensemble') tierDiscountRate = 0.03;
@@ -411,12 +411,25 @@
             const tierDiscountAmount = basePrice * tierDiscountRate;
             const voucherDiscount = window.appData.selectedVoucherDiscount;
             const netAmount = Math.max(0, basePrice - tierDiscountAmount - voucherDiscount);
-            const starsCredited = Math.round(netAmount * 2);
+            
+            // Correct Star Conversion Rate: RM2 = 1 Star (Net / 2)
+            const starsCredited = Math.round(netAmount / 2);
 
             document.getElementById('breakdown-original').innerText = `RM ${basePrice.toFixed(2)}`;
             document.getElementById('breakdown-discount').innerText = `- RM ${(tierDiscountAmount + voucherDiscount).toFixed(2)} (Inc. ${(tierDiscountRate * 100)}% ${family.tier} Tier + Voucher)`;
             document.getElementById('breakdown-net').innerText = `RM ${netAmount.toFixed(2)}`;
             document.getElementById('breakdown-stars').innerText = `+${starsCredited} ⭐`;
+
+            // Low wallet warning logic
+            const lowWalletWarning = document.getElementById('low-wallet-warning');
+            if (lowWalletWarning) {
+                if (Number(family.wallet || 0) < netAmount) {
+                    lowWalletWarning.classList.remove('hidden');
+                    lowWalletWarning.innerText = `⚠️ Low Wallet Warning: Wallet balance (RM ${Number(family.wallet || 0).toFixed(2)}) is less than net fee (RM ${netAmount.toFixed(2)})!`;
+                } else {
+                    lowWalletWarning.classList.add('hidden');
+                }
+            }
         }
 
         window.completePosCheckout = async function() {
@@ -441,7 +454,7 @@
             const tierDiscountAmount = basePrice * tierDiscountRate;
             const voucherDiscount = window.appData.selectedVoucherDiscount;
             const netAmount = Math.max(0, basePrice - tierDiscountAmount - voucherDiscount);
-            const starsEarned = Math.round(netAmount * 2);
+            const starsEarned = Math.round(netAmount / 2); // RM2 = 1 star
 
             const currentWallet = Number(family.wallet || 0);
             if (currentWallet < netAmount) {
@@ -469,7 +482,16 @@
                     starsChange: `+${starsEarned} ⭐`
                 });
 
-                alert(`Counter checkout successful for ${student.name}! Deducted RM ${netAmount.toFixed(2)} from wallet and credited +${starsEarned} stars.`);
+                // Show Receipt Modal instead of basic alert
+                showReceiptModal({
+                    studentName: student.name,
+                    familyKey: familyKey,
+                    workshop: wsTitle,
+                    netAmount: netAmount,
+                    remainingWallet: newWallet,
+                    starsEarned: starsEarned,
+                    totalStars: newStars
+                });
                 
                 window.appData.selectedVoucherId = null;
                 window.appData.selectedVoucherDiscount = 0;
@@ -481,9 +503,48 @@
                 alert("Error recording POS transaction.");
             }
         }
+
+        window.showReceiptModal = function(receiptData) {
+            const modal = document.getElementById('receipt-modal');
+            const content = document.getElementById('receipt-modal-content');
+            if (!modal || !content) return;
+
+            const textToCopy = `🎵 *EXPRESSIVOCLUB RECEIPT* 🎵\n📅 Date: ${new Date().toLocaleDateString()}\n👤 Student: ${receiptData.studentName} (Family: ${receiptData.familyKey})\n📚 Event: ${receiptData.workshop}\n💳 Deducted: RM ${receiptData.netAmount.toFixed(2)}\n💰 Remaining Wallet: RM ${receiptData.remainingWallet.toFixed(2)}\n⭐ Stars Earned: +${receiptData.starsEarned} (Total: ${receiptData.totalStars})\n\nThank you for learning with Expressivo Club! ✨`;
+
+            content.innerHTML = `
+                <div class="space-y-3 text-xs text-slate-700">
+                    <div class="bg-slate-50 p-3 rounded-xl border space-y-2 font-mono">
+                        <p class="font-bold text-slate-900 text-center text-sm border-b pb-2">RECEIPT - EXPRESSIVO CLUB</p>
+                        <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                        <p><strong>Student:</strong> ${receiptData.studentName} (${receiptData.familyKey})</p>
+                        <p><strong>Workshop:</strong> ${receiptData.workshop}</p>
+                        <p><strong>Deducted:</strong> RM ${receiptData.netAmount.toFixed(2)}</p>
+                        <p><strong>Wallet Left:</strong> RM ${receiptData.remainingWallet.toFixed(2)}</p>
+                        <p><strong>Stars Earned:</strong> +${receiptData.starsEarned} ⭐ (Total: ${receiptData.totalStars})</p>
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button onclick="navigator.clipboard.writeText(\`${textToCopy}\`); alert('Receipt copied to clipboard! You can paste it directly into WhatsApp.');" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition">📋 Copy for WhatsApp</button>
+                        <button onclick="window.print()" class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl transition">🖨️ Print</button>
+                    </div>
+                    <button onclick="document.getElementById('receipt-modal').classList.add('hidden')" class="w-full py-2 bg-slate-900 text-white font-bold rounded-xl">Close Receipt</button>
+                </div>
+            `;
+            modal.classList.remove('hidden');
+        }
     </script>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans p-4 sm:p-6">
+
+    <!-- RECEIPT MODAL POPUP -->
+    <div id="receipt-modal" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-slate-900 text-base">🎉 Checkout Successful!</h3>
+                <button onclick="document.getElementById('receipt-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-lg">✕</button>
+            </div>
+            <div id="receipt-modal-content"></div>
+        </div>
+    </div>
 
     <div class="max-w-6xl mx-auto space-y-6">
         <!-- TOP HEADER -->
@@ -530,6 +591,11 @@
                     <!-- SELECTED STUDENT BADGE PREVIEW -->
                     <div id="active-student-badge" class="p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex justify-between items-center text-xs">
                         <!-- Populated by JS -->
+                    </div>
+
+                    <!-- LOW WALLET WARNING BANNER -->
+                    <div id="low-wallet-warning" class="hidden p-3 bg-amber-50 border border-amber-300 text-amber-800 font-bold rounded-xl text-xs">
+                        <!-- Populated dynamically -->
                     </div>
 
                     <div>
@@ -584,7 +650,7 @@
                     <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-1">
                         <p class="text-[10px] font-bold text-slate-400 uppercase">Stars Credited to Student:</p>
                         <p id="breakdown-stars" class="text-lg font-extrabold text-amber-400">+0 ⭐</p>
-                        <p class="text-[10px] text-slate-400">Calculated at standard rate (RM1 = 2⭐)</p>
+                        <p class="text-[10px] text-slate-400">Calculated at rate (RM2 = 1⭐)</p>
                     </div>
                 </div>
             </div>
