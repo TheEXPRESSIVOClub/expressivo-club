@@ -225,13 +225,54 @@
 
             try {
                 await addDoc(collection(db, "workshops"), {
-                    title, date, time, teacher, price, exclusive, registered: []
+                    title, date, time, teacher, price, exclusive, status: 'Open', registered: []
                 });
                 alert(`Workshop "${title}" published successfully to Cloud!`);
                 e.target.reset();
             } catch (err) {
                 console.error("Error creating workshop: ", err);
                 alert("Error publishing workshop.");
+            }
+        }
+
+        window.toggleWorkshopStatus = async function(wsId, currentStatus) {
+            const newStatus = currentStatus === 'Closed' ? 'Open' : 'Closed';
+            try {
+                await updateDoc(doc(db, "workshops", wsId), { status: newStatus });
+            } catch (err) {
+                console.error("Error updating workshop status:", err);
+            }
+        }
+
+        window.editWorkshop = async function(wsId, currentTitle, currentDate, currentTime, currentTeacher, currentPrice) {
+            const title = prompt("Edit Workshop Title:", currentTitle);
+            if (title === null) return;
+            const date = prompt("Edit Date:", currentDate);
+            if (date === null) return;
+            const time = prompt("Edit Time:", currentTime);
+            if (time === null) return;
+            const teacher = prompt("Edit Teacher:", currentTeacher);
+            if (teacher === null) return;
+            const priceStr = prompt("Edit Price (RM):", currentPrice);
+            if (priceStr === null) return;
+            const price = parseFloat(priceStr) || 0;
+
+            try {
+                await updateDoc(doc(db, "workshops", wsId), { title, date, time, teacher, price });
+                alert("Workshop updated successfully!");
+            } catch (err) {
+                console.error("Error editing workshop:", err);
+                alert("Error updating workshop.");
+            }
+        }
+
+        window.deleteWorkshop = async function(wsId, wsTitle) {
+            if (!confirm(`Are you sure you want to delete workshop "${wsTitle}"?`)) return;
+            try {
+                await deleteDoc(doc(db, "workshops", wsId));
+                alert("Workshop deleted.");
+            } catch (err) {
+                console.error("Error deleting workshop:", err);
             }
         }
 
@@ -447,11 +488,18 @@
             const wsContainer = document.getElementById('admin-workshops-list');
             wsContainer.innerHTML = data.workshops.length === 0 ? `<p class="text-slate-400 italic">No workshops scheduled.</p>` :
                 data.workshops.map(w => `
-                    <div class="bg-slate-50 p-4 rounded-xl border flex justify-between items-center">
+                    <div class="bg-slate-50 p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                         <div>
-                            <h4 class="font-bold text-slate-800">${w.title} ${w.exclusive ? '<span class="text-amber-600">⭐ Exclusive</span>' : ''}</h4>
+                            <h4 class="font-bold text-slate-800">${w.title} ${w.exclusive ? '<span class="text-amber-600">⭐ Exclusive</span>' : ''} 
+                                <span class="ml-2 px-2 py-0.5 rounded text-[10px] font-bold ${w.status === 'Closed' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}">${w.status || 'Open'}</span>
+                            </h4>
                             <p class="text-slate-500">Date: ${w.date} | Time: ${w.time || 'TBD'} | Teacher: ${w.teacher || 'TBD'} | Price: RM ${w.price}</p>
                             <p class="text-slate-600 mt-1">Registered: <span class="font-semibold">${(w.registered || []).join(', ') || 'None yet'}</span></p>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button onclick="toggleWorkshopStatus('${w.id}', '${w.status || 'Open'}')" class="px-3 py-1.5 ${w.status === 'Closed' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'} text-white font-bold rounded-lg transition">${w.status === 'Closed' ? 'Open Reg' : 'Close Reg'}</button>
+                            <button onclick="editWorkshop('${w.id}', '${w.title}', '${w.date}', '${w.time || ''}', '${w.teacher || ''}', '${w.price}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition">Edit</button>
+                            <button onclick="deleteWorkshop('${w.id}', '${w.title}')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg transition">Delete</button>
                         </div>
                     </div>
                 `).join('');
