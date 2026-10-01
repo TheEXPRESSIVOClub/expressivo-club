@@ -403,6 +403,7 @@
             const familyKey = student ? student.family : null;
             const family = familyKey ? (window.appData.families[familyKey] || { tier: 'Prelude', stars: 100, wallet: 0 }) : { tier: 'Prelude', stars: 100, wallet: 0 };
 
+            // Updated Tier Discount Rules: Crescendo = 5%, Virtuoso = 10%, Ensemble & Prelude = 0%
             let tierDiscountRate = 0;
             if (family.tier === 'Crescendo') tierDiscountRate = 0.05;
             else if (family.tier === 'Virtuoso') tierDiscountRate = 0.10;
@@ -411,7 +412,7 @@
             const voucherDiscount = window.appData.selectedVoucherDiscount;
             const netAmount = Math.max(0, basePrice - tierDiscountAmount - voucherDiscount);
             
-            // Correct Star Conversion Rate: RM2 = 1 Star (Net / 2)
+            // Star Conversion Rate: RM2 = 1 Star (Net / 2)
             const starsCredited = Math.round(netAmount / 2);
 
             document.getElementById('breakdown-original').innerText = `RM ${basePrice.toFixed(2)}`;
@@ -449,7 +450,7 @@
             const familyKey = student.family;
             const family = window.appData.families[familyKey] || { tier: 'Prelude', stars: 100, wallet: 0 };
 
-            let tierDiscountRate = family.tier === family.tier === 'Crescendo' ? 0.05 : family.tier === 'Virtuoso' ? 0.10 : 0;
+            let tierDiscountRate = family.tier === 'Crescendo' ? 0.05 : family.tier === 'Virtuoso' ? 0.10 : 0;
             const tierDiscountAmount = basePrice * tierDiscountRate;
             const voucherDiscount = window.appData.selectedVoucherDiscount;
             const netAmount = Math.max(0, basePrice - tierDiscountAmount - voucherDiscount);
@@ -481,7 +482,6 @@
                     starsChange: `+${starsEarned} ⭐`
                 });
 
-                // Show Receipt Modal instead of basic alert
                 showReceiptModal({
                     studentName: student.name,
                     familyKey: familyKey,
@@ -676,10 +676,10 @@
                         <div>
                             <label class="block font-bold text-slate-600 mb-1">Membership Tier</label>
                             <select id="new-family-tier" class="w-full p-2.5 border rounded-xl bg-white outline-none">
-                                <option value="Prelude">Prelude </option>
-                                <option value="Ensemble">Ensemble </option>
-                                <option value="Crescendo">Crescendo </option>
-                                <option value="Virtuoso">Virtuoso </option>
+                                <option value="Prelude">Prelude (0%) </option>
+                                <option value="Ensemble">Ensemble (0%)</option>
+                                <option value="Crescendo">Crescendo (5%)</option>
+                                <option value="Virtuoso">Virtuoso (10%)</option>
                             </select>
                         </div>
                         <div>
@@ -917,7 +917,7 @@
                         </div>
                         <div class="text-right">
                             <p class="font-bold ${t.amount && t.amount.startsWith('-') ? 'text-rose-600' : 'text-emerald-600'}">${t.amount || 'RM 0.00'}</p>
-                            <p class="text-amber-600 text-[10px] font-bold">${t.starsChange || ''}</p>
+                            <p class="text-amber-600 text-[10px] font-bold ${t.starsChange && t.starsChange.startsWith('+') ? 'text-amber-600' : ''}">${t.starsChange || ''}</p>
                         </div>
                     </div>
                 `).join('');
