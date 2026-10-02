@@ -445,6 +445,7 @@
             const family = familyKey ? (window.appData.families[familyKey] || { tier: 'Prelude', stars: 100, wallet: 0 }) : { tier: 'Prelude', stars: 100, wallet: 0 };
 
             let tierDiscountRate = 0;
+            if (family.tier === 'Ensemble') tierDiscountRate = 0;
             if (family.tier === 'Crescendo') tierDiscountRate = 0.05;
             else if (family.tier === 'Virtuoso') tierDiscountRate = 0.10;
 
@@ -935,6 +936,7 @@
                         <label class="block font-bold text-slate-600 mb-1">Membership Tier</label>
                         <select id="new-family-tier" class="w-full p-2.5 border rounded-lg bg-white">
                             <option value="Prelude">Prelude (0%)</option>
+                            <option value="Ensemble">Ensemble (0%)</option>
                             <option value="Crescendo">Crescendo (5%)</option>
                             <option value="Virtuoso">Virtuoso (10%)</option>
                         </select>
