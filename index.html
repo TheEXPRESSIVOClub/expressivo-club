@@ -720,12 +720,31 @@
                 const familyKey = student ? student.family : null;
                 const famVouchers = window.appData.vouchers.filter(v => v.family === familyKey && v.status === 'Approved & Available');
                 
-                posVouchersContainer.innerHTML = famVouchers.length === 0 ? '<p class="text-xs text-slate-400 italic">No available approved vouchers for this student family.</p>' : famVouchers.map(v => `
-                    <div onclick="selectPosVoucher('${v.id}', '${v.title}', ${v.discount || 5})" class="p-2 border rounded-xl cursor-pointer hover:bg-indigo-50 text-xs flex justify-between items-center ${window.appData.selectedVoucherId === v.id ? 'border-indigo-600 bg-indigo-50 font-bold' : ''}">
-                        <span>🎁 ${v.title} (-RM ${v.discount || 5})</span>
-                        <span class="text-indigo-600">Select</span>
-                    </div>
-                `).join('');
+                posVouchersContainer.innerHTML = famVouchers.length === 0 ? '<p class="text-xs text-slate-400 italic">No available approved vouchers for this student family.</p>' : famVouchers.map(v => {
+    let discountVal = Number(v.discount) || 0;
+    let titleLower = (v.title || '').toLowerCase();
+    
+    // Determine discount dynamically based on voucher title / star redemption tier
+    if (titleLower.includes('free') || titleLower.includes('1000')) {
+        discountVal = parseFloat(document.getElementById('pos-original-price').value) || 120;
+    } else if (titleLower.includes('50%') || titleLower.includes('600')) {
+        const base = parseFloat(document.getElementById('pos-original-price').value) || 120;
+        discountVal = base * 0.5;
+    } else if (titleLower.includes('rm20') || titleLower.includes('400')) {
+        discountVal = 20;
+    } else if (titleLower.includes('rm10') || titleLower.includes('200')) {
+        discountVal = 10;
+    } else if (titleLower.includes('rm5') || titleLower.includes('100')) {
+        discountVal = 5;
+    }
+
+    return `
+        <div onclick="selectPosVoucher('${v.id}', '${v.title}', ${discountVal})" class="p-2 border rounded-xl cursor-pointer hover:bg-indigo-50 text-xs flex justify-between items-center ${window.appData.selectedVoucherId === v.id ? 'border-indigo-600 bg-indigo-50 font-bold' : ''}">
+            <span>🎁 ${v.title} (-RM ${discountVal.toFixed(2)})</span>
+            <span class="text-indigo-600">Select</span>
+        </div>
+    `;
+}).join('');
             }
 
             // Update POS Active Student Badge
