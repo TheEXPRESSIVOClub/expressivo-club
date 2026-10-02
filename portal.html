@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { initializeFirestore, collection, doc, updateDoc, deleteDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { initializeFirestore, collection, doc, updateDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHvyRDPEG9jzFbqSTuKmTjvnRDShmN6uU",
@@ -24,7 +24,7 @@
         });
 
         window.db = db;
-        window.portalData = { student: null, family: null, siblings: [], workshops: [], transactions: [], vouchers: [] };
+        window.portalData = { student: null, family: null, siblings: [], workshops: [], transactions: [] };
 
         function initPortal() {
             renderRewardsCatalog();
@@ -77,13 +77,6 @@
                 snapshot.forEach(d => window.portalData.transactions.push({ id: d.id, ...d.data() }));
                 renderTransactions();
             });
-
-            onSnapshot(collection(db, "vouchers"), (snapshot) => {
-                window.portalData.vouchers = [];
-                snapshot.forEach(d => window.portalData.vouchers.push({ id: d.id, ...d.data() }));
-                renderApprovedVouchers();
-                renderWorkshops();
-            });
         }
 
         window.claimVoucher = async function(title, cost) {
@@ -128,12 +121,17 @@
 
         window.registerWorkshop = async function(wId) {
             const data = window.portalData;
-            if (!data.student) {
+            if (!data.student || !data.family) {
                 alert("Student details not loaded yet.");
                 return;
             }
             const ws = data.workshops.find(w => w.id === wId);
             if (!ws) return;
+
+            if (ws.status === 'Closed') {
+                alert('Registration for this workshop is currently closed.');
+                return;
+            }
 
             const registeredList = ws.registered || [];
             if (registeredList.includes(data.student.name)) {
@@ -141,77 +139,56 @@
                 return;
             }
 
-            const rawPrice = parseFloat(ws.price) || 0;
             const tier = data.family?.tier || 'Prelude';
+            let basePrice = parseFloat(ws.price) || 0;
+            let finalPrice = basePrice;
+            let discountDesc = '';
 
-            // Membership Tier Discount Percentage Calculation
-            let tierDiscountPercent = 0;
-            if (tier === 'Symphony') tierDiscountPercent = 0.15;
-            else if (tier === 'Concerto') tierDiscountPercent = 0.10;
-            else if (tier === 'Sonata') tierDiscountPercent = 0.05;
-
-            let priceAfterTier = rawPrice * (1 - tierDiscountPercent);
-
-            // Check selected voucher
-            const voucherSelect = document.getElementById(`voucher-select-${wId}`);
-            const voucherId = voucherSelect ? voucherSelect.value : "";
-            
-            let finalPrice = priceAfterTier;
-            let appliedVoucherTitle = "";
-            let usedVoucherObj = null;
-
-            if (voucherId) {
-                usedVoucherObj = data.vouchers.find(v => v.id === voucherId && (v.status === 'Approved' || v.status === 'approved'));
-                if (usedVoucherObj) {
-                    appliedVoucherTitle = usedVoucherObj.title;
-                    const t = appliedVoucherTitle.toLowerCase();
-                    if (t.includes('free')) {
-                        finalPrice = 0;
-                    } else if (t.includes('50%')) {
-                        finalPrice = priceAfterTier * 0.5;
-                    } else if (t.includes('rm5')) {
-                        finalPrice = Math.max(0, priceAfterTier - 5);
-                    } else if (t.includes('rm10')) {
-                        finalPrice = Math.max(0, priceAfterTier - 10);
-                    } else if (t.includes('rm20')) {
-                        finalPrice = Math.max(0, priceAfterTier - 20);
-                    }
-                }
+            if (tier === 'Crescendo') {
+                finalPrice = basePrice * 0.95;
+                discountDesc = ' (5% Crescendo Tier Discount)';
+            } else if (tier === 'Virtuoso') {
+                finalPrice = basePrice * 0.90;
+                discountDesc = ' (10% Virtuoso Tier Discount)';
             }
 
-            // Calculate stars reward: RM2 = 1 star based on final payable price
+            const currentWallet = Number(data.family.wallet || 0);
+            if (currentWallet < finalPrice) {
+                alert(`Insufficient wallet balance! This workshop costs RM ${finalPrice.toFixed(2)}, but your family wallet balance is RM ${currentWallet.toFixed(2)}. Please contact admin to top up.`);
+                return;
+            }
+
             const starsEarned = Math.floor(finalPrice / 2);
 
             try {
+                // 1. Add student to workshop registration list
                 registeredList.push(data.student.name);
                 await updateDoc(doc(db, "workshops", wId), { registered: registeredList });
 
-                const currentStars = data.family?.stars ?? 100;
-                await updateDoc(doc(db, "families", data.student.family), { stars: currentStars + starsEarned });
+                // 2. Deduct wallet & add earned stars to family account
+                const newWalletBalance = currentWallet - finalPrice;
+                const currentStars = Number(data.family?.stars ?? 100);
+                const newStarsBalance = currentStars + starsEarned;
 
-                if (usedVoucherObj) {
-                    await deleteDoc(doc(db, "vouchers", usedVoucherObj.id));
-                }
+                await updateDoc(doc(db, "families", data.student.family), { 
+                    wallet: newWalletBalance,
+                    stars: newStarsBalance
+                });
 
-                let descText = `Registered for Workshop: ${ws.title}`;
-                if (appliedVoucherTitle) {
-                    descText += ` (Applied Voucher: ${appliedVoucherTitle}, Tier: ${tier})`;
-                } else {
-                    descText += ` (Tier: ${tier})`;
-                }
-
+                // 3. Log transaction audit record
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
                     student: data.student.name,
                     family: data.student.family,
-                    desc: descText,
+                    desc: `Workshop Booking: ${ws.title}${discountDesc}`,
                     amount: `- RM ${finalPrice.toFixed(2)}`,
                     starsChange: `+${starsEarned} ⭐`
                 });
 
-                alert(`Registered successfully for ${ws.title}!\nFinal Price: RM ${finalPrice.toFixed(2)} (Tier + Voucher applied)\nEarned: +${starsEarned} Stars`);
+                alert(`Successfully booked ${ws.title}! Paid RM ${finalPrice.toFixed(2)}${discountDesc} from your wallet. (+${starsEarned} Stars earned)`);
             } catch (err) {
                 console.error("Error registering workshop: ", err);
+                alert("Error processing workshop booking.");
             }
         };
 
@@ -241,63 +218,51 @@
             }
         }
 
-        function renderApprovedVouchers() {
-            const data = window.portalData;
-            const container = document.getElementById('approved-vouchers-list');
-            if (!container) return;
-
-            const familyVouchers = data.student ? data.vouchers.filter(v => v.family === data.student.family || v.claimedBy === data.student.name) : data.vouchers;
-            
-            container.innerHTML = familyVouchers.length === 0 ?
-                `<p class="text-slate-400 italic text-xs">No active or pending vouchers found.</p>` :
-                familyVouchers.map(v => {
-                    const isApproved = v.status === 'Approved' || v.status === 'approved';
-                    return `
-                        <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center text-xs">
-                            <div>
-                                <p class="font-bold text-slate-800">${v.title} <span class="text-slate-500 font-normal">(${v.claimedBy || 'Family'})</span></p>
-                                <p class="text-[10px] text-slate-400 mt-0.5">Cost: ${v.cost} ⭐</p>
-                            </div>
-                            <div>
-                                <span class="px-2.5 py-1 rounded-lg font-bold text-[10px] ${isApproved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}">${v.status || 'Pending Verification'}</span>
-                            </div>
-                      </div>
-                `).join('');
-          }
-
         function renderWorkshops() {
             const data = window.portalData;
             const container = document.getElementById('parent-workshops-list');
             if (!container) return;
 
-            const approvedVouchers = data.vouchers.filter(v => (v.status === 'Approved' || v.status === 'approved') && (!data.student || v.family === data.student.family || v.claimedBy === data.student.name));
+            const tier = data.family?.tier || 'Prelude';
 
             container.innerHTML = data.workshops.length === 0 ?
                 `<p class="text-slate-400 italic text-xs">No upcoming workshops scheduled.</p>` :
                 data.workshops.map(w => {
                     const isReg = data.student && (w.registered || []).includes(data.student.name);
-                    const calculatedStars = Math.floor((parseFloat(w.price) || 0) / 2);
+                    const isClosed = w.status === 'Closed';
+                    
+                    let basePrice = parseFloat(w.price) || 0;
+                    let displayPriceHtml = `RM ${basePrice.toFixed(2)}`;
+                    let effectivePrice = basePrice;
+
+                    if (tier === 'Crescendo') {
+                        effectivePrice = basePrice * 0.95;
+                        displayPriceHtml = `<span class="line-through text-slate-400">RM ${basePrice.toFixed(2)}</span> <span class="text-emerald-600 font-bold">RM ${effectivePrice.toFixed(2)} (5% Off)</span>`;
+                    } else if (tier === 'Virtuoso') {
+                        effectivePrice = basePrice * 0.90;
+                        displayPriceHtml = `<span class="line-through text-slate-400">RM ${basePrice.toFixed(2)}</span> <span class="text-emerald-600 font-bold">RM ${effectivePrice.toFixed(2)} (10% Off)</span>`;
+                    }
+
+                    const calculatedStars = Math.floor(effectivePrice / 2);
+
                     return `
                         <div class="bg-slate-50 p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
                             <div>
-                                <h4 class="font-bold text-slate-800 text-sm">${w.title} ${w.exclusive ? '<span class="text-amber-600 font-semibold">⭐ Exclusive</span>' : ''}</h4>
+                                <h4 class="font-bold text-slate-800 text-sm">${w.title} 
+                                    ${w.exclusive ? '<span class="text-amber-600 font-semibold">⭐ Exclusive</span>' : ''}
+                                    ${isClosed ? '<span class="ml-2 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">Closed</span>' : ''}
+                                </h4>
                                 <p class="text-slate-500 mt-0.5">📅 Date: ${w.date} | ⏰ Time: ${w.time || 'TBD'} | 👨‍🏫 Teacher: ${w.teacher || 'TBD'}</p>
-                                <p class="text-slate-600 font-semibold mt-0.5">Price: RM ${w.price} <span class="text-amber-600 font-bold ml-2">(Earns +${calculatedStars} ⭐)</span></p>
-                          </div>
-                            <div class="flex flex-col gap-2 w-full sm:w-auto">
-                                ${isReg ? `<span class="px-3 py-1.5 bg-emerald-100 text-emerald-700 font-bold rounded-lg block text-center">Registered ✓</span>` : `
-                                    ${approvedVouchers.length > 0 ? `
-                                        <select id="voucher-select-${w.id}" class="p-1.5 border rounded-lg text-xs bg-white text-slate-700">
-                                            <option value="">-- Apply Approved Voucher (Optional) --</option>
-                                            ${approvedVouchers.map(v => `<option value="${v.id}">${v.title}</option>`).join('')}
-                                        </select>
-                                    ` : ''}
-                                    <button onclick="registerWorkshop('${w.id}')" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition">Book Workshop</button>
-                                `}
-                          </div>
-                    </div>
-                `;
-            }).join('');
+                                <p class="text-slate-600 font-semibold mt-0.5">Price: ${displayPriceHtml} <span class="text-amber-600 font-bold ml-2">(Earns +${calculatedStars} ⭐)</span></p>
+                            </div>
+                            <div>
+                                ${isReg ? `<span class="px-3 py-1.5 bg-emerald-100 text-emerald-700 font-bold rounded-lg block text-center">Registered ✓</span>` :
+                                  isClosed ? `<span class="px-3 py-1.5 bg-slate-200 text-slate-500 font-bold rounded-lg block text-center">Registration Closed</span>` :
+                                  `<button onclick="registerWorkshop('${w.id}')" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition">Book & Deduct Wallet</button>`}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
         }
 
         function renderTransactions() {
@@ -319,8 +284,8 @@
                             <p class="font-bold ${t.amount && t.amount.startsWith('-') ? 'text-rose-600' : 'text-emerald-600'}">${t.amount || 'RM 0.00'}</p>
                             <p class="text-amber-600 text-[10px] font-bold">${t.starsChange || ''}</p>
                         </div>
-                  </div>
-              `).join('');
+                    </div>
+                `).join('');
         }
 
         function updatePortalUI() {
@@ -341,7 +306,6 @@
 
             renderTransactions();
             renderWorkshops();
-            renderApprovedVouchers();
         }
 
         window.onload = initPortal;
@@ -363,8 +327,8 @@
                 </div>
                 <div class="flex items-center gap-3 bg-indigo-600/40 border border-indigo-500/50 px-4 py-2 rounded-xl">
                     <div>
-                      <p class="text-[10px] text-indigo-200 uppercase tracking-wider font-bold">Family Star Balance</p>
-                      <p class="text-xl font-extrabold text-amber-300" id="header-stars">100 ⭐</p>
+                        <p class="text-[10px] text-indigo-200 uppercase tracking-wider font-bold">Family Star Balance</p>
+                        <p class="text-xl font-extrabold text-amber-300" id="header-stars">100 ⭐</p>
                     </div>
                 </div>
             </div>
@@ -382,7 +346,7 @@
                 <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-2">
                     <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Family Credit Wallet</p>
                     <p class="text-3xl font-extrabold text-slate-800" id="family-wallet-balance">RM 0.00</p>
-                    <p class="text-xs text-slate-500">Shared balance for tuition & materials.</p>
+                    <p class="text-xs text-slate-500">Shared balance for tuition & workshops.</p>
                 </div>
                 <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-2">
                     <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Siblings / Associated Students</p>
@@ -401,11 +365,6 @@
             <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
                 <h2 class="text-lg font-bold text-slate-800 border-b pb-3">🌟 Star Redemption Catalog</h2>
                 <div id="rewards-list" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
-            </div>
-
-            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-3">
-                <h3 class="text-sm font-bold text-slate-800 border-b pb-3">🎟️ My Vouchers (Pending & Approved)</h3>
-                <div id="approved-vouchers-list" class="space-y-2 text-xs"></div>
             </div>
         </div>
 
@@ -427,6 +386,6 @@
             document.getElementById(`content-${tab}`).classList.remove('hidden');
             document.getElementById(`tab-${tab}`).className = "px-4 py-2 bg-slate-900 text-white rounded-lg whitespace-nowrap";
         }
-      </script>
+    </script>
 </body>
 </html>
