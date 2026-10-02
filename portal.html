@@ -24,7 +24,7 @@
         });
 
         window.db = db;
-        window.portalData = { student: null, family: null, siblings: [], workshops: [], transactions: [] };
+        window.portalData = { student: null, family: null, siblings: [], workshops: [], transactions: [], vouchers: [] };
 
         function initPortal() {
             renderRewardsCatalog();
@@ -76,6 +76,11 @@
                 window.portalData.transactions = [];
                 snapshot.forEach(d => window.portalData.transactions.push({ id: d.id, ...d.data() }));
                 renderTransactions();
+            });
+
+            onSnapshot(collection(db, "vouchers"), (snapshot) => {
+                window.portalData.vouchers = [];
+                snapshot.forEach(d => window.portalData.vouchers.push({ id: d.id, ...d.data() }));
             });
         }
 
@@ -141,16 +146,53 @@
 
             const tier = data.family?.tier || 'Prelude';
             let basePrice = parseFloat(ws.price) || 0;
-            let finalPrice = basePrice;
-            let discountDesc = '';
+            let tierDiscountedPrice = basePrice;
+            let tierDiscountDesc = '';
 
             if (tier === 'Crescendo') {
-                finalPrice = basePrice * 0.95;
-                discountDesc = ' (5% Crescendo Tier Discount)';
+                tierDiscountedPrice = basePrice * 0.95;
+                tierDiscountDesc = ' (5% Crescendo Tier Discount)';
             } else if (tier === 'Virtuoso') {
-                finalPrice = basePrice * 0.90;
-                discountDesc = ' (10% Virtuoso Tier Discount)';
+                tierDiscountedPrice = basePrice * 0.90;
+                tierDiscountDesc = ' (10% Virtuoso Tier Discount)';
             }
+
+            // Checks for Approved Vouchers under the family's ID
+            const familyId = data.student.family;
+            const approvedVouchers = data.vouchers.filter(v => v.family === familyId && v.status === 'Approved & Available');
+
+            let selectedVoucher = null;
+            let voucherDiscountAmount = 0;
+
+            if (approvedVouchers.length > 0) {
+                let promptText = "You have the following Approved Vouchers available:\n0: Do not use a voucher\n";
+                approvedVouchers.forEach((v, index) => {
+                    promptText += `${index + 1}: ${v.title}\n`;
+                });
+                promptText += "\nEnter the number corresponding to the voucher you want to use:";
+
+                const choice = prompt(promptText);
+                if (choice !== null && choice.trim() !== "" && choice.trim() !== "0") {
+                    const idx = parseInt(choice.trim()) - 1;
+                    if (idx >= 0 && idx < approvedVouchers.length) {
+                        selectedVoucher = approvedVouchers[idx];
+                        // Extract numeric value from voucher title (e.g. "RM10 Off Workshop" -> 10, or "50% Off Workshop" -> 50% of price)
+                        if (selectedVoucher.title.includes("RM")) {
+                            const match = selectedVoucher.title.match(/RM(\d+)/);
+                            if (match) {
+                                voucherDiscountAmount = parseFloat(match[1]);
+                            }
+                        } else if (selectedVoucher.title.includes("50%")) {
+                            voucherDiscountAmount = tierDiscountedPrice * 0.50;
+                        } else if (selectedVoucher.title.includes("FREE")) {
+                            voucherDiscountAmount = tierDiscountedPrice;
+                        }
+                    }
+                }
+            }
+
+            let finalPrice = Math.max(0, tierDiscountedPrice - voucherDiscountAmount);
+            let voucherDesc = selectedVoucher ? ` + Applied Voucher: ${selectedVoucher.title}` : '';
 
             const currentWallet = Number(data.family.wallet || 0);
             if (currentWallet < finalPrice) {
@@ -165,27 +207,32 @@
                 registeredList.push(data.student.name);
                 await updateDoc(doc(db, "workshops", wId), { registered: registeredList });
 
-                // 2. Deduct wallet & add earned stars to family account
+                // 2. If a voucher was used, update its status to 'Redeemed'
+                if (selectedVoucher) {
+                    await updateDoc(doc(db, "vouchers", selectedVoucher.id), { status: 'Redeemed' });
+                }
+
+                // 3. Deduct wallet & add earned stars to family account
                 const newWalletBalance = currentWallet - finalPrice;
                 const currentStars = Number(data.family?.stars ?? 100);
                 const newStarsBalance = currentStars + starsEarned;
 
-                await updateDoc(doc(db, "families", data.student.family), { 
+                await updateDoc(doc(db, "families", familyId), { 
                     wallet: newWalletBalance,
                     stars: newStarsBalance
                 });
 
-                // 3. Log transaction audit record
+                // 4. Log transaction audit record
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
                     student: data.student.name,
-                    family: data.student.family,
-                    desc: `Workshop Booking: ${ws.title}${discountDesc}`,
+                    family: familyId,
+                    desc: `Workshop Booking: ${ws.title}${tierDiscountDesc}${voucherDesc}`,
                     amount: `- RM ${finalPrice.toFixed(2)}`,
                     starsChange: `+${starsEarned} ⭐`
                 });
 
-                alert(`Successfully booked ${ws.title}! Paid RM ${finalPrice.toFixed(2)}${discountDesc} from your wallet. (+${starsEarned} Stars earned)`);
+                alert(`Successfully booked ${ws.title}! Paid RM ${finalPrice.toFixed(2)}${tierDiscountDesc}${voucherDesc} from your wallet. (+${starsEarned} Stars earned)`);
             } catch (err) {
                 console.error("Error registering workshop: ", err);
                 alert("Error processing workshop booking.");
