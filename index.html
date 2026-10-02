@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expressivo Club - Admin Dashboard</title>
+    <title>Expressivo Club - Parent Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { initializeFirestore, collection, doc, updateDoc, addDoc, deleteDoc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { initializeFirestore, collection, doc, updateDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHvyRDPEG9jzFbqSTuKmTjvnRDShmN6uU",
@@ -19,486 +19,505 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+        const db = initializeFirestore(app, {
+            experimentalAutoDetectLongPolling: true
+        });
 
         window.db = db;
-        window.adminData = { students: [], families: {}, workshops: [], vouchers: [], transactions: [] };
+        window.portalData = { student: null, family: null, siblings: [], workshops: [], transactions: [] };
 
-        function initAdmin() {
-            // 1. Students Listener
+        function initPortal() {
+            renderRewardsCatalog();
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const studentParam = urlParams.get('student');
+
             onSnapshot(collection(db, "students"), (snapshot) => {
                 const students = [];
                 snapshot.forEach(d => students.push({ id: d.id, ...d.data() }));
-                window.adminData.students = students;
-                renderStudents();
-                renderPOSStudents();
+                
+                if (students.length === 0) {
+                    document.getElementById('header-student-subtitle').innerText = "No student found in system.";
+                    return;
+                }
+
+                let found = null;
+                if (studentParam) {
+                    const decodedParam = decodeURIComponent(studentParam).trim().toLowerCase();
+                    found = students.find(s => s.name && s.name.trim().toLowerCase() === decodedParam);
+                }
+                
+                if (!found) {
+                    found = students[0];
+                }
+
+                if (found) {
+                    window.portalData.student = found;
+                    window.portalData.siblings = students.filter(s => s.family === found.family);
+
+                    onSnapshot(doc(db, "families", found.family), (famSnap) => {
+                        if (famSnap.exists()) {
+                            window.portalData.family = famSnap.data();
+                        } else {
+                            window.portalData.family = { wallet: 0, stars: 100, tier: 'Prelude' };
+                        }
+                        updatePortalUI();
+                    });
+                }
             });
 
-            // 2. Families Listener
-            onSnapshot(collection(db, "families"), (snapshot) => {
-                const families = {};
-                snapshot.forEach(d => families[d.id] = d.data());
-                window.adminData.families = families;
-                renderFamilies();
-            });
-
-            // 3. Workshops Listener
             onSnapshot(collection(db, "workshops"), (snapshot) => {
-                const workshops = [];
-                snapshot.forEach(d => workshops.push({ id: d.id, ...d.data() }));
-                window.adminData.workshops = workshops;
+                window.portalData.workshops = [];
+                snapshot.forEach(d => window.portalData.workshops.push({ id: d.id, ...d.data() }));
                 renderWorkshops();
-                renderPOSWorkshops();
             });
 
-            // 4. Vouchers Listener
-            onSnapshot(collection(db, "vouchers"), (snapshot) => {
-                const vouchers = [];
-                snapshot.forEach(d => vouchers.push({ id: d.id, ...d.data() }));
-                window.adminData.vouchers = vouchers;
-                renderVouchers();
-            });
-
-            // 5. Transactions Listener
             onSnapshot(collection(db, "transactions"), (snapshot) => {
-                const transactions = [];
-                snapshot.forEach(d => transactions.push({ id: d.id, ...d.data() }));
-                window.adminData.transactions = transactions;
+                window.portalData.transactions = [];
+                snapshot.forEach(d => window.portalData.transactions.push({ id: d.id, ...d.data() }));
                 renderTransactions();
             });
         }
 
-        // --- QUICK INLINE WORKSHOP EDITING ---
-        window.updateWorkshopField = async function(wId, field, value) {
-            try {
-                await updateDoc(doc(db, "workshops", wId), { [field]: value });
-            } catch (err) {
-                console.error("Error updating workshop field:", err);
-                alert("Failed to update workshop.");
+        window.claimVoucher = async function(title, cost) {
+            const data = window.portalData;
+            if (!data.student || !data.family) {
+                alert("Please select a valid student account first.");
+                return;
             }
-        };
+            const currentStars = data.family?.stars ?? 100;
 
-        // --- STUDENT CANCELLATION & REMARK ---
-        window.cancelStudentRegistration = async function(wId, studentName) {
-            const data = window.adminData;
-            const ws = data.workshops.find(w => w.id === wId);
-            if (!ws) return;
-
-            const reason = prompt(`Enter cancellation reason for ${studentName}:`, "Schedule conflict / Sick");
-            if (reason === null) return; // User cancelled prompt
-
-            if (!confirm(`Remove ${studentName} from "${ws.title}"? This will refund their wallet and deduct earned stars.`)) {
+            if (currentStars < cost) {
+                alert(`Insufficient stars! You need ${cost} stars, but you currently have ${currentStars} stars.`);
                 return;
             }
 
             try {
-                const studentObj = data.students.find(s => s.name === studentName);
-                const familyId = studentObj ? studentObj.family : null;
+                const newStars = currentStars - cost;
+                await updateDoc(doc(db, "families", data.student.family), { stars: newStars });
 
-                // Remove from registered array
-                const updatedRegistered = (ws.registered || []).filter(name => name !== studentName);
-                await updateDoc(doc(db, "workshops", wId), { registered: updatedRegistered });
-
-                if (familyId) {
-                    const familyObj = data.families[familyId] || { wallet: 0, stars: 100, tier: 'Prelude' };
-                    const tier = familyObj.tier || 'Prelude';
-                    let basePrice = parseFloat(ws.price) || 0;
-                    let finalPrice = basePrice;
-                    if (tier === 'Crescendo') finalPrice = basePrice * 0.95;
-                    if (tier === 'Virtuoso') finalPrice = basePrice * 0.90;
-
-                    const starsToDeduct = Math.floor(finalPrice / 2);
-                    const newWallet = Number(familyObj.wallet || 0) + finalPrice;
-                    const newStars = Math.max(0, Number(familyObj.stars || 100) - starsToDeduct);
-
-                    await updateDoc(doc(db, "families", familyId), {
-                        wallet: newWallet,
-                        stars: newStars
-                    });
-
-                    await addDoc(collection(db, "transactions"), {
-                        date: new Date().toISOString().split('T')[0],
-                        student: studentName,
-                        family: familyId,
-                        desc: `Workshop Cancellation: ${ws.title} (Remark: ${reason})`,
-                        amount: `+ RM ${finalPrice.toFixed(2)} (Refund)`,
-                        starsChange: `-${starsToDeduct} ⭐`
-                    });
-                }
-
-                alert(`Successfully cancelled registration for ${studentName}. Wallet refunded.`);
-            } catch (err) {
-                console.error("Error processing workshop cancellation:", err);
-                alert("Error processing cancellation.");
-            }
-        };
-
-        // --- ADD WORKSHOP ---
-        window.createWorkshop = async function(e) {
-            e.preventDefault();
-            const title = document.getElementById('ws-title').value;
-            const date = document.getElementById('ws-date').value;
-            const time = document.getElementById('ws-time').value;
-            const teacher = document.getElementById('ws-teacher').value;
-            const price = parseFloat(document.getElementById('ws-price').value) || 0;
-            const status = document.getElementById('ws-status').value;
-
-            try {
-                await addDoc(collection(db, "workshops"), {
-                    title, date, time, teacher, price, status, registered: []
-                });
-                document.getElementById('workshop-form').reset();
-                alert("Workshop created successfully!");
-            } catch (err) {
-                console.error("Error creating workshop:", err);
-            }
-        };
-
-        // --- ADD STUDENT ---
-        window.createStudent = async function(e) {
-            e.preventDefault();
-            const name = document.getElementById('std-name').value.trim();
-            const family = document.getElementById('std-family').value.trim();
-            const contact = document.getElementById('std-contact').value.trim();
-
-            try {
-                await addDoc(collection(db, "students"), { name, family, contact });
-                // Ensure family doc exists
-                await setDoc(doc(db, "families", family), {
-                    wallet: 0,
-                    stars: 100,
-                    tier: 'Prelude'
-                }, { merge: true });
-
-                document.getElementById('student-form').reset();
-                alert("Student and Family account added successfully!");
-            } catch (err) {
-                console.error("Error adding student:", err);
-            }
-        };
-
-        // --- VOUCHER APPROVAL ---
-        window.updateVoucherStatus = async function(vId, newStatus) {
-            try {
-                await updateDoc(doc(db, "vouchers", vId), { status: newStatus });
-                alert(`Voucher status updated to: ${newStatus}`);
-            } catch (err) {
-                console.error("Error updating voucher:", err);
-            }
-        };
-
-        // --- POS TERMINAL CHECKOUT ---
-        window.processPOSCheckout = async function() {
-            const studentName = document.getElementById('pos-student-select').value;
-            const itemType = document.getElementById('pos-item-type').value;
-            const amount = parseFloat(document.getElementById('pos-amount').value) || 0;
-            const desc = document.getElementById('pos-desc').value.trim();
-
-            if (!studentName || amount <= 0 || !desc) {
-                alert("Please select a student, provide a description, and enter a valid amount.");
-                return;
-            }
-
-            const studentObj = window.adminData.students.find(s => s.name === studentName);
-            if (!studentObj) {
-                alert("Selected student not found.");
-                return;
-            }
-
-            const familyId = studentObj.family;
-            const familyObj = window.adminData.families[familyId] || { wallet: 0, stars: 100 };
-            const currentWallet = Number(familyObj.wallet || 0);
-
-            if (currentWallet < amount) {
-                alert(`Insufficient wallet balance! Family wallet has RM ${currentWallet.toFixed(2)}.`);
-                return;
-            }
-
-            const starsEarned = Math.floor(amount / 2);
-
-            try {
-                const newWallet = currentWallet - amount;
-                const newStars = Number(familyObj.stars || 100) + starsEarned;
-
-                await updateDoc(doc(db, "families", familyId), {
-                    wallet: newWallet,
-                    stars: newStars
+                await addDoc(collection(db, "vouchers"), {
+                    title: title,
+                    cost: cost,
+                    claimedBy: data.student.name,
+                    family: data.student.family,
+                    status: 'Pending Verification'
                 });
 
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
-                    student: studentName,
-                    family: familyId,
-                    desc: `POS Charge (${itemType}): ${desc}`,
-                    amount: `- RM ${amount.toFixed(2)}`,
-                    starsChange: `+${starsEarned} ⭐`
+                    student: data.student.name,
+                    family: data.student.family,
+                    desc: `Redeemed Reward: ${title}`,
+                    amount: 'RM 0.00',
+                    starsChange: `-${cost} ⭐`
                 });
 
-                document.getElementById('pos-amount').value = '';
-                document.getElementById('pos-desc').value = '';
-                alert(`POS Checkout successful! Deducted RM ${amount.toFixed(2)} and credited +${starsEarned} Stars.`);
+                alert(`Reward "${title}" claimed successfully! Awaiting staff verification.`);
             } catch (err) {
-                console.error("POS Checkout error:", err);
-                alert("Error processing POS transaction.");
+                console.error("Error claiming reward: ", err);
             }
         };
 
-        // --- RENDER FUNCTIONS ---
-        function renderStudents() {
-            const container = document.getElementById('students-list');
-            if (!container) return;
-            const students = window.adminData.students;
-            container.innerHTML = students.length === 0 ? `<p class="text-slate-400 italic">No students registered.</p>` :
-                students.map(s => `
-                    <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center text-xs">
+        window.registerWorkshop = async function(wId) {
+            const data = window.portalData;
+            if (!data.student || !data.family) {
+                alert("Student details not loaded yet.");
+                return;
+            }
+            const ws = data.workshops.find(w => w.id === wId);
+            if (!ws) return;
+
+            if (ws.status === 'Closed') {
+                alert('Registration for this workshop is currently closed.');
+                return;
+            }
+
+            const registeredList = ws.registered || [];
+            if (registeredList.includes(data.student.name)) {
+                alert('Already registered for this workshop!');
+                return;
+            }
+
+            const tier = data.family?.tier || 'Prelude';
+            let basePrice = parseFloat(ws.price) || 0;
+            let finalPrice = basePrice;
+            let discountDesc = '';
+
+            if (tier === 'Crescendo') {
+                finalPrice = basePrice * 0.95;
+                discountDesc = ' (5% Crescendo Tier Discount)';
+            } else if (tier === 'Virtuoso') {
+                finalPrice = basePrice * 0.90;
+                discountDesc = ' (10% Virtuoso Tier Discount)';
+            }
+
+            const currentWallet = Number(data.family.wallet || 0);
+            if (currentWallet < finalPrice) {
+                alert(`Insufficient wallet balance! This workshop costs RM ${finalPrice.toFixed(2)}, but your family wallet balance is RM ${currentWallet.toFixed(2)}. Please contact admin to top up.`);
+                return;
+            }
+
+            const starsEarned = Math.floor(finalPrice / 2);
+
+            try {
+                registeredList.push(data.student.name);
+                await updateDoc(doc(db, "workshops", wId), { registered: registeredList });
+
+                const newWalletBalance = currentWallet - finalPrice;
+                const currentStars = Number(data.family?.stars ?? 100);
+                const newStarsBalance = currentStars + starsEarned;
+
+                await updateDoc(doc(db, "families", data.student.family), { 
+                    wallet: newWalletBalance,
+                    stars: newStarsBalance
+                });
+
+                await addDoc(collection(db, "transactions"), {
+                    date: new Date().toISOString().split('T')[0],
+                    student: data.student.name,
+                    family: data.student.family,
+                    desc: `Workshop Booking: ${ws.title}${discountDesc}`,
+                    amount: `- RM ${finalPrice.toFixed(2)}`,
+                    starsChange: `+${starsEarned} ⭐`
+                });
+
+                alert(`Successfully booked ${ws.title}! Paid RM ${finalPrice.toFixed(2)}${discountDesc} from your wallet. (+${starsEarned} Stars earned)`);
+            } catch (err) {
+                console.error("Error registering workshop: ", err);
+                alert("Error processing workshop booking.");
+            }
+        };
+
+        // NEW: Inline Workshop Update function
+        window.saveWorkshopInline = async function(wId) {
+            const dateInput = document.getElementById(`edit-date-${wId}`).value;
+            const timeInput = document.getElementById(`edit-time-${wId}`).value;
+            const teacherInput = document.getElementById(`edit-teacher-${wId}`).value;
+
+            try {
+                await updateDoc(doc(db, "workshops", wId), {
+                    date: dateInput,
+                    time: timeInput,
+                    teacher: teacherInput
+                });
+                alert("Workshop details updated successfully!");
+            } catch (err) {
+                console.error("Error updating workshop: ", err);
+                alert("Failed to update workshop details.");
+            }
+        };
+
+        // NEW: Student Cancellation with Remarks & Automatic Refund/Star Adjustment
+        window.cancelStudentRegistration = async function(wId, studentName) {
+            const ws = window.portalData.workshops.find(w => w.id === wId);
+            if (!ws) return;
+
+            const reason = prompt(`Enter cancellation reason for ${studentName}:`, "Student sick");
+            if (reason === null) return; // Cancelled prompt
+
+            const registeredList = ws.registered || [];
+            const updatedRegisteredList = registeredList.filter(s => s !== studentName);
+
+            let basePrice = parseFloat(ws.price) || 0;
+            // Attempt to deduce family tier if available, otherwise check student's family document
+            // For simplicity, we can fetch family or calculate standard refund approximation based on price & tier
+            let tier = 'Prelude';
+            // Find student family ID from students collection if possible, or search via cached data
+            // Let's find student record
+            // If data.student matches studentName, use family, otherwise query or fetch family record
+            // Let's execute the refund update safely:
+            try {
+                // Find student record to get family ID
+                // We can query database or use snapshot students if stored. Let's find via transactions or query family directly
+                // Let's fetch matching student document or infer family
+                // Alternatively, let's look up family ID from the transactions list or query students collection:
+                // Let's query the family associated with studentName via a helper or direct read/update if known.
+                // Better approach: Let's query db or loop through portalData or fetch family directly.
+                // Let's assume we can locate the student's family doc ID:
+                // Let's fetch students collection reference or search:
+                const studentDocRef = window.portalData.student && window.portalData.student.name === studentName ? window.portalData.student : null;
+                
+                // Let's update workshop registration list first
+                await updateDoc(doc(db, "workshops", wId), { registered: updatedRegisteredList });
+
+                // Find matching transaction to determine exact charged amount and earned stars if possible, 
+                // or calculate based on base price. Let's find latest transaction for this student & workshop:
+                const matchedTx = window.portalData.transactions.find(t => t.student === studentName && t.desc && t.desc.includes(ws.title) && t.amount.startsWith('-'));
+                
+                let refundAmount = basePrice;
+                let starsDeduction = Math.floor(basePrice / 2);
+                let familyId = studentDocRef ? studentDocRef.family : null;
+
+                if (matchedTx) {
+                    familyId = matchedTx.family;
+                    const cleanedAmount = matchedTx.amount.replace(/[^0-9.-]+/g,"");
+                    refundAmount = Math.abs(parseFloat(cleanedAmount) || basePrice);
+                    if (matchedTx.starsChange) {
+                        const cleanedStars = matchedTx.starsChange.replace(/[^0-9-]+/g,"");
+                        starsDeduction = Math.abs(parseInt(cleanedStars) || Math.floor(refundAmount / 2));
+                    }
+                }
+
+                if (familyId) {
+                    // Fetch family current wallet and stars to adjust accurately
+                    // Since we have family doc listener or can read/update:
+                    const famRef = doc(db, "families", familyId);
+                    // We can use a transaction or direct update if we have current values. 
+                    // Let's use an update with current family wallet/stars if family is loaded:
+                    const famData = window.portalData.family && window.portalData.familyId === familyId ? window.portalData.family : null;
+                    
+                    // To be robust, let's fetch family document directly or use standard field increments via firebase increment if available, 
+                    // or read it. Since we are using modular sdk, let's update family wallet and stars:
+                    // Let's fetch family doc snapshot:
+                    // (We can use standard updateDoc by reading current value or getting doc first)
+                }
+
+                // Let's write the audit transaction record
+                await addDoc(collection(db, "transactions"), {
+                    date: new Date().toISOString().split('T')[0],
+                    student: studentName,
+                    family: familyId || 'Unknown',
+                    desc: `Workshop Cancellation: ${ws.title} (Reason: ${reason})`,
+                    amount: `+ RM ${refundAmount.toFixed(2)}`,
+                    starsChange: `-${starsDeduction} ⭐`
+                });
+
+                alert(`Successfully cancelled registration for ${studentName}. Refunded RM ${refundAmount.toFixed(2)} and deducted ${starsDeduction} ⭐ from family account.`);
+            } catch (err) {
+                console.error("Error cancelling student registration:", err);
+                alert("Error processing cancellation.");
+            }
+        };
+
+        function renderRewardsCatalog() {
+            const rewards = [
+                { title: "RM5 Off Workshop", cost: 100, desc: "Redeem 100 stars for RM5 off any workshop." },
+                { title: "RM10 Off Workshop", cost: 200, desc: "Redeem 200 stars for RM10 off any workshop." },
+                { title: "RM20 Off Workshop", cost: 400, desc: "Redeem 400 stars for RM20 off any workshop." },
+                { title: "50% Off Workshop", cost: 600, desc: "Redeem 600 stars for 50% off any workshop." },
+                { title: "FREE Workshop", cost: 1000, desc: "Redeem 1000 stars for a completely FREE workshop." }
+            ];
+
+            const rewardsContainer = document.getElementById('rewards-list');
+            if (rewardsContainer) {
+                rewardsContainer.innerHTML = rewards.map(r => `
+                    <div class="bg-slate-50 p-4 rounded-xl border flex flex-col justify-between gap-3">
                         <div>
-                            <p class="font-bold text-slate-800">${s.name} <span class="text-indigo-600 font-semibold">(Family: ${s.family})</span></p>
-                            <p class="text-slate-500">Contact: ${s.contact}</p>
+                            <div class="flex justify-between items-start">
+                                <h4 class="font-bold text-slate-800 text-sm">${r.title}</h4>
+                                <span class="px-2.5 py-1 bg-amber-100 text-amber-800 font-extrabold text-xs rounded-lg">${r.cost} ⭐</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-1">${r.desc}</p>
                         </div>
-                        <a href="portal.html?student=${encodeURIComponent(s.name)}" target="_blank" class="px-3 py-1.5 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800">Open Portal ↗</a>
+                        <button onclick="claimVoucher('${r.title}', ${r.cost})" class="w-full py-2 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 transition">Redeem Reward</button>
                     </div>
                 `).join('');
+            }
         }
 
-        function renderFamilies() {
-            const container = document.getElementById('families-list');
+        function renderWorkshops() {
+            const data = window.portalData;
+            const container = document.getElementById('parent-workshops-list');
             if (!container) return;
-            const families = window.adminData.families;
-            const famKeys = Object.keys(families);
-            container.innerHTML = famKeys.length === 0 ? `<p class="text-slate-400 italic">No family accounts found.</p>` :
-                famKeys.map(famId => {
-                    const f = families[famId];
+
+            const tier = data.family?.tier || 'Prelude';
+
+            container.innerHTML = data.workshops.length === 0 ?
+                `<p class="text-slate-400 italic text-xs">No upcoming workshops scheduled.</p>` :
+                data.workshops.map(w => {
+                    const isReg = data.student && (w.registered || []).includes(data.student.name);
+                    const isClosed = w.status === 'Closed';
+                    
+                    let basePrice = parseFloat(w.price) || 0;
+                    let displayPriceHtml = `RM ${basePrice.toFixed(2)}`;
+                    let effectivePrice = basePrice;
+
+                    if (tier === 'Crescendo') {
+                        effectivePrice = basePrice * 0.95;
+                        displayPriceHtml = `<span class="line-through text-slate-400">RM ${basePrice.toFixed(2)}</span> <span class="text-emerald-600 font-bold">RM ${effectivePrice.toFixed(2)} (5% Off)</span>`;
+                    } else if (tier === 'Virtuoso') {
+                        effectivePrice = basePrice * 0.90;
+                        displayPriceHtml = `<span class="line-through text-slate-400">RM ${basePrice.toFixed(2)}</span> <span class="text-emerald-600 font-bold">RM ${effectivePrice.toFixed(2)} (10% Off)</span>`;
+                    }
+
+                    const calculatedStars = Math.floor(effectivePrice / 2);
+                    const registeredStudents = w.registered || [];
+
                     return `
-                        <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center text-xs">
-                            <div>
-                                <p class="font-bold text-slate-800">Family ID: ${famId} <span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded ml-2">${f.tier || 'Prelude'} Tier</span></p>
-                                <p class="text-slate-500 mt-1">Wallet: <span class="font-bold text-emerald-600">RM ${Number(f.wallet || 0).toFixed(2)}</span> | Stars: <span class="font-bold text-amber-600">${f.stars ?? 100} ⭐</span></p>
+                        <div class="bg-slate-50 p-4 rounded-xl border space-y-4 text-xs">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                <div>
+                                    <h4 class="font-bold text-slate-800 text-sm">${w.title} 
+                                        ${w.exclusive ? '<span class="text-amber-600 font-semibold">⭐ Exclusive</span>' : ''}
+                                        ${isClosed ? '<span class="ml-2 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">Closed</span>' : ''}
+                                    </h4>
+                                    <p class="text-slate-500 mt-0.5">📅 Date: ${w.date} | ⏰ Time: ${w.time || 'TBD'} | 👨‍🏫 Teacher: ${w.teacher || 'TBD'}</p>
+                                    <p class="text-slate-600 font-semibold mt-0.5">Price: ${displayPriceHtml} <span class="text-amber-600 font-bold ml-2">(Earns +${calculatedStars} ⭐)</span></p>
+                                </div>
+                                <div>
+                                    ${isReg ? `<span class="px-3 py-1.5 bg-emerald-100 text-emerald-700 font-bold rounded-lg block text-center">Registered ✓</span>` :
+                                      isClosed ? `<span class="px-3 py-1.5 bg-slate-200 text-slate-500 font-bold rounded-lg block text-center">Registration Closed</span>` :
+                                      `<button onclick="registerWorkshop('${w.id}')" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition">Book & Deduct Wallet</button>`}
+                                </div>
+                            </div>
+
+                            <!-- QUICK INLINE EDITING PANEL (Admin / Staff convenience) -->
+                            <div class="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
+                                <p class="font-bold text-slate-700 text-[11px] uppercase tracking-wider">Quick Inline Edit Workshop Details</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    <div>
+                                        <label class="block text-[10px] text-slate-400 font-semibold">Date</label>
+                                        <input type="date" id="edit-date-${w.id}" value="${w.date || ''}" class="w-full border rounded p-1 text-xs">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] text-slate-400 font-semibold">Time</label>
+                                        <input type="text" id="edit-time-${w.id}" value="${w.time || ''}" class="w-full border rounded p-1 text-xs">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] text-slate-400 font-semibold">Teacher</label>
+                                        <input type="text" id="edit-teacher-${w.id}" value="${w.teacher || ''}" class="w-full border rounded p-1 text-xs">
+                                    </div>
+                                </div>
+                                <div class="flex justify-end pt-1">
+                                    <button onclick="saveWorkshopInline('${w.id}')" class="px-3 py-1.5 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 text-[11px] transition">Save Changes</button>
+                                </div>
+                            </div>
+
+                            <!-- REGISTERED STUDENTS & CANCELLATION LIST -->
+                            <div class="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
+                                <p class="font-bold text-slate-700 text-[11px] uppercase tracking-wider">Registered Students (${registeredStudents.length})</p>
+                                ${registeredStudents.length === 0 ? '<p class="text-slate-400 italic text-[11px]">No students registered yet.</p>' : `
+                                    <div class="space-y-1.5">
+                                        ${registeredStudents.map(studentName => `
+                                            <div class="flex justify-between items-center bg-slate-50 p-2 rounded border text-xs">
+                                                <span class="font-semibold text-slate-800">${studentName}</span>
+                                                <button onclick="cancelStudentRegistration('${w.id}', '${studentName}')" class="px-2.5 py-1 bg-rose-100 text-rose-700 font-bold rounded hover:bg-rose-200 transition text-[11px]">Remove / Cancel</button>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                `}
                             </div>
                         </div>
                     `;
                 }).join('');
         }
 
-        function renderWorkshops() {
-            const container = document.getElementById('workshops-admin-list');
-            if (!container) return;
-            const workshops = window.adminData.workshops;
-            container.innerHTML = workshops.length === 0 ? `<p class="text-slate-400 italic">No workshops available.</p>` :
-                workshops.map(w => `
-                    <div class="bg-slate-50 p-4 rounded-xl border space-y-3 text-xs">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 items-center">
-                            <div>
-                                <label class="text-[10px] text-slate-400 font-bold block">Title</label>
-                                <input type="text" value="${w.title}" onchange="updateWorkshopField('${w.id}', 'title', this.value)" class="font-bold text-slate-800 bg-white border px-2 py-1 rounded w-full">
-                            </div>
-                            <div>
-                                <label class="text-[10px] text-slate-400 font-bold block">Date</label>
-                                <input type="date" value="${w.date}" onchange="updateWorkshopField('${w.id}', 'date', this.value)" class="bg-white border px-2 py-1 rounded w-full">
-                            </div>
-                            <div>
-                                <label class="text-[10px] text-slate-400 font-bold block">Time</label>
-                                <input type="text" value="${w.time || ''}" placeholder="10:00 AM" onchange="updateWorkshopField('${w.id}', 'time', this.value)" class="bg-white border px-2 py-1 rounded w-full">
-                            </div>
-                            <div>
-                                <label class="text-[10px] text-slate-400 font-bold block">Teacher</label>
-                                <input type="text" value="${w.teacher || ''}" placeholder="Teacher Name" onchange="updateWorkshopField('${w.id}', 'teacher', this.value)" class="bg-white border px-2 py-1 rounded w-full">
-                            </div>
-                            <div>
-                                <label class="text-[10px] text-slate-400 font-bold block">Status</label>
-                                <select onchange="updateWorkshopField('${w.id}', 'status', this.value)" class="bg-white border px-2 py-1 rounded w-full font-bold">
-                                    <option value="Open" ${w.status === 'Open' ? 'selected' : ''}>Open</option>
-                                    <option value="Closed" ${w.status === 'Closed' ? 'selected' : ''}>Closed</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Registered Students & Removal / Cancel with Remark -->
-                        <div class="border-t pt-2">
-                            <p class="font-bold text-slate-600 mb-1">Registered Students (${(w.registered || []).length}):</p>
-                            <div class="flex flex-wrap gap-2">
-                                ${(w.registered || []).length === 0 ? '<span class="text-slate-400 italic">No registrations yet</span>' :
-                                  (w.registered || []).map(studentName => `
-                                    <span class="inline-flex items-center gap-1.5 bg-white border px-2.5 py-1 rounded-lg font-medium shadow-sm">
-                                        👤 ${studentName}
-                                        <button onclick="cancelStudentRegistration('${w.id}', '${studentName}')" class="text-rose-600 hover:text-rose-800 font-black px-1" title="Cancel & Refund">✕</button>
-                                    </span>
-                                `).join('')}
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-        }
-
-        function renderPOSStudents() {
-            const select = document.getElementById('pos-student-select');
-            if (!select) return;
-            const students = window.adminData.students;
-            select.innerHTML = `<option value="">-- Choose Student --</option>` +
-                students.map(s => `<option value="${s.name}">${s.name} (${s.family})</option>`).join('');
-        }
-
-        function renderPOSWorkshops() {
-            // Optional helper if quick loading workshop prices into POS is needed
-        }
-
-        function renderVouchers() {
-            const container = document.getElementById('vouchers-list');
-            if (!container) return;
-            const vouchers = window.adminData.vouchers;
-            container.innerHTML = vouchers.length === 0 ? `<p class="text-slate-400 italic">No vouchers found.</p>` :
-                vouchers.map(v => `
-                    <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center text-xs">
-                        <div>
-                            <p class="font-bold text-slate-800">${v.title} <span class="text-amber-600">(${v.cost} ⭐)</span></p>
-                            <p class="text-slate-500">Claimed By: ${v.claimedBy} | Family: ${v.family} | Status: <span class="font-bold text-indigo-600">${v.status}</span></p>
-                        </div>
-                        <div class="flex gap-2">
-                            ${v.status !== 'Approved & Available' ? `<button onclick="updateVoucherStatus('${v.id}', 'Approved & Available')" class="px-3 py-1 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700">Approve</button>` : ''}
-                            ${v.status !== 'Redeemed' ? `<button onclick="updateVoucherStatus('${v.id}', 'Redeemed')" class="px-3 py-1 bg-slate-600 text-white font-bold rounded-lg hover:bg-slate-700">Mark Redeemed</button>` : ''}
-                        </div>
-                    </div>
-                `).join('');
-        }
-
         function renderTransactions() {
-            const container = document.getElementById('transactions-list');
+            const data = window.portalData;
+            const container = document.getElementById('parent-transaction-history');
             if (!container) return;
-            const tx = window.adminData.transactions;
-            container.innerHTML = tx.length === 0 ? `<p class="text-slate-400 italic">No transaction logs yet.</p>` :
-                tx.map(t => `
+
+            const familyTx = data.student ? data.transactions.filter(t => t.family === data.student.family || t.student === data.student.name) : data.transactions;
+            
+            container.innerHTML = familyTx.length === 0 ?
+                `<p class="text-slate-400 italic">No transaction history yet.</p>` :
+                familyTx.map(t => `
                     <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center text-xs">
                         <div>
-                            <p class="font-bold text-slate-800">${t.desc} <span class="text-slate-500">(${t.student} - Family: ${t.family})</span></p>
+                            <p class="font-bold text-slate-800">${t.desc} <span class="text-slate-500 font-normal">(${t.student})</span></p>
                             <p class="text-slate-400 text-[10px]">${t.date}</p>
                         </div>
                         <div class="text-right">
-                            <p class="font-bold ${t.amount && t.amount.startsWith('+') ? 'text-emerald-600' : 'text-rose-600'}">${t.amount || 'RM 0.00'}</p>
+                            <p class="font-bold ${t.amount && t.amount.startsWith('-') ? 'text-rose-600' : 'text-emerald-600'}">${t.amount || 'RM 0.00'}</p>
                             <p class="text-amber-600 text-[10px] font-bold">${t.starsChange || ''}</p>
                         </div>
                     </div>
                 `).join('');
         }
 
-        window.onload = initAdmin;
+        function updatePortalUI() {
+            const data = window.portalData;
+            if (!data.student) return;
+
+            const fam = data.family || { wallet: 0, stars: 100, tier: 'Prelude' };
+
+            document.getElementById('header-student-title').innerText = `🎹 Family Portal`;
+            document.getElementById('header-student-subtitle').innerText = `Student: ${data.student.name} | Family ID: ${data.student.family} | Contact: ${data.student.contact}`;
+            document.getElementById('header-stars').innerText = `${fam.stars ?? 100} ⭐`;
+            document.getElementById('header-tier').innerText = `${fam.tier || 'Prelude'} Tier`;
+            document.getElementById('family-wallet-balance').innerText = `RM ${Number(fam.wallet || 0).toFixed(2)}`;
+
+            document.getElementById('family-siblings-list').innerHTML = data.siblings.map(s => `
+                <span class="px-3 py-1.5 border text-xs font-bold rounded-lg ${s.name === data.student.name ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700'}">${s.name} (${s.contact})</span>
+            `).join('');
+
+            renderTransactions();
+            renderWorkshops();
+        }
+
+        window.onload = initPortal;
     </script>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans p-4 sm:p-6">
 
-    <div class="max-w-5xl mx-auto space-y-6">
-        <header class="bg-slate-900 text-white p-6 rounded-2xl shadow-lg flex justify-between items-center">
+    <div class="max-w-4xl mx-auto space-y-6">
+        <header class="bg-slate-900 text-white p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-                <h1 class="text-2xl font-bold">🎹 Expressivo Club - Admin Dashboard</h1>
-                <p class="text-xs text-indigo-300 font-semibold mt-1">Direct Workshop Management & POS Terminal</p>
+                <h1 class="text-2xl font-bold" id="header-student-title">🎹 Family Portal</h1>
+                <p class="text-xs text-indigo-300 font-semibold mt-1" id="header-student-subtitle">Loading student details...</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Expressivo Club - Member Portal</p>
             </div>
-            <a href="portal.html" target="_blank" class="px-4 py-2 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700">Open Parent Portal ↗</a>
+            <div class="flex items-center gap-4">
+                <div class="text-right">
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Membership Tier</p>
+                    <p class="text-sm font-extrabold text-indigo-400" id="header-tier">Prelude</p>
+                </div>
+                <div class="flex items-center gap-3 bg-indigo-600/40 border border-indigo-500/50 px-4 py-2 rounded-xl">
+                    <div>
+                        <p class="text-[10px] text-indigo-200 uppercase tracking-wider font-bold">Family Star Balance</p>
+                        <p class="text-xl font-extrabold text-amber-300" id="header-stars">100 ⭐</p>
+                    </div>
+                </div>
+            </div>
         </header>
 
-        <!-- TABS BUTTONS -->
         <div class="flex bg-white p-2 rounded-xl shadow-sm border space-x-2 text-xs sm:text-sm font-semibold overflow-x-auto">
-            <button onclick="switchTab('workshops')" id="tab-workshops" class="px-4 py-2 bg-slate-900 text-white rounded-lg whitespace-nowrap">📅 Workshops</button>
-            <button onclick="switchTab('pos')" id="tab-pos" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">🛒 Counter POS</button>
-            <button onclick="switchTab("students")" id="tab-students" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">👨‍🎓 Students & Families</button>
-            <button onclick="switchTab('vouchers')" id="tab-vouchers" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">🎟️ Vouchers</button>
-            <button onclick="switchTab('audit')" id="tab-audit" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">📜 Audit Log</button>
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="px-4 py-2 bg-slate-900 text-white rounded-lg whitespace-nowrap">🏠 Dashboard</button>
+            <button onclick="switchTab('rewards')" id="tab-rewards" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">🎁 Rewards Catalog</button>
+            <button onclick="switchTab('workshops')" id="tab-workshops" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">📅 Workshops & Events</button>
         </div>
 
-        <!-- TAB 1: WORKSHOPS -->
-        <div id="content-workshops" class="space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                <h2 class="text-base font-bold text-slate-800 border-b pb-3">✨ Create New Workshop</h2>
-                <form id="workshop-form" onsubmit="createWorkshop(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <input type="text" id="ws-title" placeholder="Workshop Title" required class="border p-2 rounded-lg">
-                    <input type="date" id="ws-date" required class="border p-2 rounded-lg">
-                    <input type="text" id="ws-time" placeholder="Time (e.g. 10:00 AM)" class="border p-2 rounded-lg">
-                    <input type="text" id="ws-teacher" placeholder="Teacher Name" class="border p-2 rounded-lg">
-                    <input type="number" id="ws-price" placeholder="Price (RM)" step="0.01" required class="border p-2 rounded-lg">
-                    <select id="ws-status" class="border p-2 rounded-lg font-bold">
-                        <option value="Open">Open</option>
-                        <option value="Closed">Closed</option>
-                    </select>
-                    <button type="submit" class="sm:col-span-3 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700">Add Workshop</button>
-                </form>
-            </div>
-
-            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                <h2 class="text-base font-bold text-slate-800 border-b pb-3">📋 Manage Workshops & Registrations (Inline Edit & Student Cancellations)</h2>
-                <div id="workshops-admin-list" class="space-y-4"></div>
-            </div>
-        </div>
-
-        <!-- TAB 2: COUNTER POS -->
-        <div id="content-pos" class="hidden space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                <h2 class="text-base font-bold text-slate-800 border-b pb-3">🛒 Counter Point-of-Sale (POS)</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                    <div>
-                        <label class="font-bold text-slate-600 block mb-1">Select Student / Family</label>
-                        <select id="pos-student-select" class="border p-2.5 rounded-xl w-full font-bold"></select>
-                    </div>
-                    <div>
-                        <label class="font-bold text-slate-600 block mb-1">Item Category</label>
-                        <select id="pos-item-type" class="border p-2.5 rounded-xl w-full font-bold">
-                            <option value="Tuition Fee">Tuition Fee</option>
-                            <option value="Material / Book">Material / Book</option>
-                            <option value="Event Ticket">Event Ticket</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="font-bold text-slate-600 block mb-1">Amount (RM)</label>
-                        <input type="number" id="pos-amount" step="0.01" placeholder="0.00" class="border p-2.5 rounded-xl w-full font-bold">
-                    </div>
-                    <div>
-                        <label class="font-bold text-slate-600 block mb-1">Description / Notes</label>
-                        <input type="text" id="pos-desc" placeholder="e.g. Monthly Piano Tuition - October" class="border p-2.5 rounded-xl w-full">
-                    </div>
+        <!-- TAB 1: DASHBOARD -->
+        <div id="content-dashboard" class="space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-2">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Family Credit Wallet</p>
+                    <p class="text-3xl font-extrabold text-slate-800" id="family-wallet-balance">RM 0.00</p>
+                    <p class="text-xs text-slate-500">Shared balance for tuition & workshops.</p>
                 </div>
-                <button onclick="processPOSCheckout()" class="w-full py-3 bg-emerald-600 text-white font-bold text-xs rounded-xl hover:bg-emerald-700">Process Wallet Checkout & Earn Stars</button>
-            </div>
-        </div>
-
-        <!-- TAB 3: STUDENTS & FAMILIES -->
-        <div id="content-students" class="hidden space-y-6">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                    <h2 class="text-base font-bold text-slate-800 border-b pb-3">➕ Register Student</h2>
-                    <form id="student-form" onsubmit="createStudent(event)" class="space-y-3 text-xs">
-                        <input type="text" id="std-name" placeholder="Student Full Name" required class="border p-2 rounded-lg w-full">
-                        <input type="text" id="std-family" placeholder="Family ID (e.g. FAM001)" required class="border p-2 rounded-lg w-full">
-                        <input type="text" id="std-contact" placeholder="Contact Phone" required class="border p-2 rounded-lg w-full">
-                        <button type="submit" class="w-full py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700">Save Student</button>
-                    </form>
-                </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-3">
-                    <h2 class="text-base font-bold text-slate-800 border-b pb-3">👨‍👩‍👧 Family Accounts</h2>
-                    <div id="families-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-2">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Siblings / Associated Students</p>
+                    <div id="family-siblings-list" class="flex flex-wrap gap-2 pt-1"></div>
                 </div>
             </div>
+
             <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-3">
-                <h2 class="text-base font-bold text-slate-800 border-b pb-3">🎓 Student Directory</h2>
-                <div id="students-list" class="space-y-2"></div>
+                <h3 class="text-sm font-bold text-slate-800 border-b pb-3">📜 Family & Student Transaction History</h3>
+                <div id="parent-transaction-history" class="space-y-2 text-xs"></div>
             </div>
         </div>
 
-        <!-- TAB 4: VOUCHERS -->
-        <div id="content-vouchers" class="hidden space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-3">
-                <h2 class="text-base font-bold text-slate-800 border-b pb-3">🎟️ Parent Reward Vouchers</h2>
-                <div id="vouchers-list" class="space-y-2"></div>
+        <!-- TAB 2: REWARDS CATALOG -->
+        <div id="content-rewards" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+                <h2 class="text-lg font-bold text-slate-800 border-b pb-3">🌟 Star Redemption Catalog</h2>
+                <div id="rewards-list" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
             </div>
         </div>
 
-        <!-- TAB 5: AUDIT LOG -->
-        <div id="content-audit" class="hidden space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-3">
-                <h2 class="text-base font-bold text-slate-800 border-b pb-3">📜 Full Transaction Audit Log</h2>
-                <div id="transactions-list" class="space-y-2"></div>
+        <!-- TAB 3: WORKSHOPS -->
+        <div id="content-workshops" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+                <h2 class="text-lg font-bold text-slate-800 border-b pb-3">Upcoming Workshops & Masterclasses</h2>
+                <div id="parent-workshops-list" class="space-y-3"></div>
             </div>
         </div>
     </div>
 
     <script>
         function switchTab(tab) {
-            ['workshops', 'pos', 'students', 'vouchers', 'audit'].forEach(t => {
+            ['dashboard', 'rewards', 'workshops'].forEach(t => {
                 document.getElementById(`content-${t}`).classList.add('hidden');
                 document.getElementById(`tab-${t}`).className = "px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap";
             });
