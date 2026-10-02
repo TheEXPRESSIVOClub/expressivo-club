@@ -101,12 +101,14 @@
                 const newStars = currentStars - cost;
                 await updateDoc(doc(db, "families", data.student.family), { stars: newStars });
 
+                // 👈 Updated voucher status to 'Pending Approval' so it shows up in your admin review queue
                 await addDoc(collection(db, "vouchers"), {
                     title: title,
                     cost: cost,
                     claimedBy: data.student.name,
                     family: data.student.family,
-                    status: 'Pending Verification'
+                    status: 'Pending Approval',
+                    createdAt: new Date().toISOString()
                 });
 
                 await addDoc(collection(db, "transactions"), {
@@ -118,9 +120,10 @@
                     starsChange: `-${cost} ⭐`
                 });
 
-                alert(`Reward "${title}" claimed successfully! Awaiting staff verification.`);
+                alert(`Reward "${title}" claimed successfully! Awaiting admin approval.`);
             } catch (err) {
                 console.error("Error claiming reward: ", err);
+                alert("Error claiming reward. Please try again.");
             }
         };
 
@@ -159,7 +162,7 @@
 
             // Checks for Approved Vouchers under the family's ID
             const familyId = data.student.family;
-            const approvedVouchers = data.vouchers.filter(v => v.family === familyId && v.status === 'Approved & Available');
+            const approvedVouchers = data.vouchers.filter(v => v.family === familyId && (v.status === 'Approved & Available' || v.status === 'Approved'));
 
             let selectedVoucher = null;
             let voucherDiscountAmount = 0;
@@ -176,7 +179,6 @@
                     const idx = parseInt(choice.trim()) - 1;
                     if (idx >= 0 && idx < approvedVouchers.length) {
                         selectedVoucher = approvedVouchers[idx];
-                        // Extract numeric value from voucher title (e.g. "RM10 Off Workshop" -> 10, or "50% Off Workshop" -> 50% of price)
                         if (selectedVoucher.title.includes("RM")) {
                             const match = selectedVoucher.title.match(/RM(\d+)/);
                             if (match) {
@@ -203,16 +205,13 @@
             const starsEarned = Math.floor(finalPrice / 2);
 
             try {
-                // 1. Add student to workshop registration list
                 registeredList.push(data.student.name);
                 await updateDoc(doc(db, "workshops", wId), { registered: registeredList });
 
-                // 2. If a voucher was used, update its status to 'Redeemed'
                 if (selectedVoucher) {
                     await updateDoc(doc(db, "vouchers", selectedVoucher.id), { status: 'Redeemed' });
                 }
 
-                // 3. Deduct wallet & add earned stars to family account
                 const newWalletBalance = currentWallet - finalPrice;
                 const currentStars = Number(data.family?.stars ?? 100);
                 const newStarsBalance = currentStars + starsEarned;
@@ -222,7 +221,6 @@
                     stars: newStarsBalance
                 });
 
-                // 4. Log transaction audit record
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
                     student: data.student.name,
