@@ -612,7 +612,6 @@
                         <tr class="border-b hover:bg-slate-50">
                             <td class="p-3 font-bold text-slate-900">${s.name}</td>
                             <td class="p-3 text-slate-600">${s.family}</td>
-                            <td class="p-3 text-slate-600">${s.dob || 'Not set'}</td>
                             <td class="p-3 text-slate-600">${s.contact || '-'}</td>
                             <td class="p-3"><span class="px-2 py-0.5 bg-indigo-100 text-indigo-800 font-bold rounded text-[10px]">${fam.tier || 'Prelude'}</span></td>
                             <td class="p-3 font-bold text-emerald-600">RM ${Number(fam.wallet || 0).toFixed(2)}</td>
@@ -629,17 +628,6 @@
                 }).join('');
             }
 
-            // Inside updateAdminUI() student loop mapping:
-            const currentMonth = new Date().getMonth() + 1; // 1 to 12
-            const studentDob = s.dob || '';
-            const studentMonth = studentDob ? parseInt(studentDob.split('-')[1]) : null;
-            const isBirthdayMonth = studentMonth === currentMonth;
-            
-            const birthdayBadge = isBirthdayMonth 
-                ? `<span class="px-2 py-0.5 bg-pink-100 text-pink-700 font-bold rounded text-[10px] ml-1">🎂 Birthday Month!</span>` 
-                : '';
-             }
-        
             // Update Workshops List with Quick Inline Editing & Student Cancellation with Remarks
             const workshopsContainer = document.getElementById('admin-workshops-container');
             if (workshopsContainer) {
@@ -960,9 +948,6 @@
                         <input type="text" id="new-family-id" placeholder="e.g. FAM-109" required class="w-full p-2.5 border rounded-lg bg-white">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Birth Date</label>
-                        <input type="date" id="new-student-dob" required class="w-full border rounded-xl px-3 py-2 text-sm">
-                    </div>
                         <label class="block font-bold text-slate-600 mb-1">Contact Phone</label>
                         <input type="text" id="new-student-contact" placeholder="012-3456789" class="w-full p-2.5 border rounded-lg bg-white">
                     </div>
