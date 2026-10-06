@@ -96,15 +96,15 @@
                 return;
             }
 
-            let csvContent = "data:text/csv;charset=utf-8,Student Name,Family ID,Contact Number,Membership Tier,Wallet Balance (RM),Stars\r\n";
+            let csvContent = "data:text/csv;charset=utf-8,Student Name,Family ID,Contact Number,Date of Birth,Membership Tier,Wallet Balance (RM),Stars\r\n";
 
             data.students.forEach(s => {
                 const fam = data.families[s.family] || { wallet: 0, stars: 100, tier: 'Prelude' };
                 const row = [
                     `"${s.name || ''}"`,
                     `"${s.family || ''}"`,
-                    `"${s.dob || ''}"`,
                     `"${s.contact || ''}"`,
+                    `"${s.dob || ''}"`,
                     `"${fam.tier || 'Prelude'}"`,
                     `"${Number(fam.wallet || 0).toFixed(2)}"`,
                     `"${fam.stars || 100}"`
