@@ -125,9 +125,12 @@
             e.preventDefault();
             const name = document.getElementById('new-student-name').value.trim();
             const familyId = document.getElementById('new-family-id').value.trim();
-            const dobInput = document.getElementById('new-student-dob');
-            const dob = dobInput ? dobInput.value : 'MISSING ELEMENT';
             const contact = document.getElementById('new-student-contact').value.trim();
+
+            // Explicitly grab the date value, with a clear fallback if empty
+            const dobInput = document.getElementById('new-student-dob');
+            const dob = (dobInput && dobInput.value) ? dobInput.value : '2016-01-01';
+            
             const tier = document.getElementById('new-family-tier').value;
             const wallet = parseFloat(document.getElementById('new-family-wallet').value) || 0;
 
