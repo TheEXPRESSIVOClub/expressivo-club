@@ -622,10 +622,10 @@
                         : '';
                     return `
                         <tr class="border-b hover:bg-slate-50">
-                            <td class="p-3 font-bold text-slate-900">${s.name} ${birthdayBadge}  
-                            <td class="p-3 font-bold text-slate-900">${s.name}</td>
+                            <td class="p-3 font-bold text-slate-900">${s.name} ${birthdayBadge}</td>
                             <td class="p-3 text-slate-600">${s.family}</td>
                             <td class="p-3 text-slate-600">${s.contact || '-'}</td>
+                            <td class="p-3 text-slate-600">${s.dob || '<span class="text-amber-500 italic font-semibold">Not set</span>'}</td>
                             <td class="p-3"><span class="px-2 py-0.5 bg-indigo-100 text-indigo-800 font-bold rounded text-[10px]">${fam.tier || 'Prelude'}</span></td>
                             <td class="p-3 font-bold text-emerald-600">RM ${Number(fam.wallet || 0).toFixed(2)}</td>
                             <td class="p-3 font-bold text-amber-600">${fam.stars || 100} ⭐</td>
