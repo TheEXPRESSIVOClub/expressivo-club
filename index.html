@@ -103,6 +103,7 @@
                 const row = [
                     `"${s.name || ''}"`,
                     `"${s.family || ''}"`,
+                    `"${s.dob || ''}"`,
                     `"${s.contact || ''}"`,
                     `"${fam.tier || 'Prelude'}"`,
                     `"${Number(fam.wallet || 0).toFixed(2)}"`,
@@ -138,7 +139,7 @@
                     tier: tier
                 }, { merge: true });
 
-                await addDoc(collection(db, "students"), { name, family: familyId, contact, dob: '2016-01-01' });
+                await addDoc(collection(db, "students"), { name, family: familyId, contact, dob });
 
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
