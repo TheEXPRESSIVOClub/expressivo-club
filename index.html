@@ -124,7 +124,6 @@
             e.preventDefault();
             const name = document.getElementById('new-student-name').value.trim();
             const familyId = document.getElementById('new-family-id').value.trim();
-            const dob = document.getElementById('new-student-dob').value;
             const contact = document.getElementById('new-student-contact').value.trim();
             const tier = document.getElementById('new-family-tier').value;
             const wallet = parseFloat(document.getElementById('new-family-wallet').value) || 0;
@@ -137,7 +136,7 @@
                     tier: tier
                 }, { merge: true });
 
-                await addDoc(collection(db, "students"), { name, family: familyId, contact, dob });
+                await addDoc(collection(db, "students"), { name, family: familyId, contact, dob: '2016-01-01' });
 
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
@@ -608,21 +607,13 @@
             const studentsTableBody = document.getElementById('admin-students-table');
             if (studentsTableBody) {
                 studentsTableBody.innerHTML = window.appData.students.map(s => {
-                    window.appData.students.map(s => {
-             const fam = window.appData.families[s.family] || { wallet: 0, stars: 100, tier: 'Prelude' };
-    
-             // Check if it's their birthday month
-             const currentMonth = new Date().getMonth() + 1;
-             const studentMonth = s.dob ? parseInt(s.dob.split('-')[1]) : null;
-             const isBirthdayMonth = studentMonth === currentMonth;
-             const birthdayBadge = isBirthdayMonth ? `<span class="px-2 py-0.5 bg-pink-100 text-pink-700 font-bold rounded text-[10px] ml-1">🎂 Birthday Month!</span>` : '';
-
-             return `
-                 <tr class="border-b hover:bg-slate-50">
-                     <td class="p-3 font-bold text-slate-900">${s.name}${birthdayBadge}</td>
-                     <td class="p-3 text-slate-600">${s.family}</td>
-                     <td class="p-3 text-slate-600">${s.dob || 'Not set'}</td>
-                     <td class="p-3 text-slate-600">${s.contact || '-'}</td>
+                    const fam = window.appData.families[s.family] || { wallet: 0, stars: 100, tier: 'Prelude' };
+                    return `
+                        <tr class="border-b hover:bg-slate-50">
+                            <td class="p-3 font-bold text-slate-900">${s.name}</td>
+                            <td class="p-3 text-slate-600">${s.family}</td>
+                            <td class="p-3 text-slate-600">${s.dob || 'Not set'}</td>
+                            <td class="p-3 text-slate-600">${s.contact || '-'}</td>
                             <td class="p-3"><span class="px-2 py-0.5 bg-indigo-100 text-indigo-800 font-bold rounded text-[10px]">${fam.tier || 'Prelude'}</span></td>
                             <td class="p-3 font-bold text-emerald-600">RM ${Number(fam.wallet || 0).toFixed(2)}</td>
                             <td class="p-3 font-bold text-amber-600">${fam.stars || 100} ⭐</td>
@@ -638,6 +629,17 @@
                 }).join('');
             }
 
+            // Inside updateAdminUI() student loop mapping:
+            const currentMonth = new Date().getMonth() + 1; // 1 to 12
+            const studentDob = s.dob || '';
+            const studentMonth = studentDob ? parseInt(studentDob.split('-')[1]) : null;
+            const isBirthdayMonth = studentMonth === currentMonth;
+            
+            const birthdayBadge = isBirthdayMonth 
+                ? `<span class="px-2 py-0.5 bg-pink-100 text-pink-700 font-bold rounded text-[10px] ml-1">🎂 Birthday Month!</span>` 
+                : '';
+             }
+        
             // Update Workshops List with Quick Inline Editing & Student Cancellation with Remarks
             const workshopsContainer = document.getElementById('admin-workshops-container');
             if (workshopsContainer) {
