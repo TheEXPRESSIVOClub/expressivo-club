@@ -84,6 +84,42 @@
             });
         }
 
+        // 🎂 BIRTHDAY REWARD CLAIM FUNCTION
+        window.claimBirthdayReward = async function() {
+            const data = window.portalData;
+            if (!data.student || !data.family) {
+                alert("Student profile not loaded.");
+                return;
+            }
+
+            try {
+                // Creates a pending voucher request for admin review
+                await addDoc(collection(db, "vouchers"), {
+                    title: "🎂 Birthday Special Gift / Voucher Claim",
+                    cost: 0,
+                    claimedBy: data.student.name,
+                    family: data.student.family,
+                    status: 'Pending Approval',
+                    createdAt: new Date().toISOString()
+                });
+
+                // Record in transactions log
+                await addDoc(collection(db, "transactions"), {
+                    date: new Date().toISOString().split('T')[0],
+                    student: data.student.name,
+                    family: data.student.family,
+                    desc: 'Claimed Birthday Month Gift / Perk',
+                    amount: 'RM 0.00',
+                    starsChange: '0 ⭐ (Birthday Special)'
+                });
+
+                alert(`🎉 Happy Birthday ${data.student.name}! Your birthday reward request has been submitted to admin. Please collect your gift/voucher at the front desk!`);
+            } catch (err) {
+                console.error("Error claiming birthday reward: ", err);
+                alert("Error claiming birthday reward. Please try again.");
+            }
+        };
+
         window.claimVoucher = async function(title, cost) {
             const data = window.portalData;
             if (!data.student || !data.family) {
@@ -349,6 +385,31 @@
                 <span class="px-3 py-1.5 border text-xs font-bold rounded-lg ${s.name === data.student.name ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700'}">${s.name} (${s.contact})</span>
             `).join('');
 
+            // 🎂 CHECK BIRTHDAY MONTH LOGIC
+            const currentMonth = new Date().getMonth() + 1; // 1 - 12
+            const studentDob = data.student.dob || '';
+            const studentMonth = studentDob ? parseInt(studentDob.split('-')[1]) : null;
+            
+            const birthdayBannerContainer = document.getElementById('birthday-reward-banner-container');
+            if (birthdayBannerContainer) {
+                if (studentMonth === currentMonth) {
+                    birthdayBannerContainer.innerHTML = `
+                        <div class="bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 p-5 rounded-2xl text-white shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <span class="bg-white/20 text-white font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full">🎉 Birthday Month Perk</span>
+                                <h3 class="text-lg font-bold mt-1">Happy Birthday Month, ${data.student.name}! 🎂</h3>
+                                <p class="text-xs text-pink-100 mt-0.5">You have an exclusive birthday perk available (Gift / Special Voucher)! Click below to claim.</p>
+                            </div>
+                            <button onclick="claimBirthdayReward()" class="px-5 py-2.5 bg-white text-pink-600 font-extrabold text-xs rounded-xl shadow-md hover:bg-pink-50 transition whitespace-nowrap">
+                                🎁 Claim Birthday Perk
+                            </button>
+                        </div>
+                    `;
+                    birthdayBannerContainer.classList.remove('hidden');
+                } else {
+                    birthdayBannerContainer.classList.add('hidden');
+                }
+            }
             renderTransactions();
             renderWorkshops();
         }
@@ -387,6 +448,10 @@
 
         <!-- TAB 1: DASHBOARD -->
         <div id="content-dashboard" class="space-y-6">
+
+            <!-- 🎂 BIRTHDAY BANNER (Auto appears when birthday month matches) -->
+            <div id="birthday-reward-banner-container" class="hidden"></div>
+            
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-2">
                     <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Family Credit Wallet</p>
