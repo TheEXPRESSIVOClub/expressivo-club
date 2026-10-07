@@ -29,6 +29,13 @@
         function initPortal() {
             renderRewardsCatalog();
 
+            // 🎫 LISTEN TO VOUCHERS COLLECTION
+        onSnapshot(collection(db, "vouchers"), (snapshot) => {
+            window.portalData.vouchers = [];
+            snapshot.forEach(d => window.portalData.vouchers.push({ id: d.id, ...d.data() }));
+            updatePortalUI();
+        });
+
             const urlParams = new URLSearchParams(window.location.search);
             const studentParam = urlParams.get('student');
 
@@ -93,8 +100,8 @@
             }
 
             try {
-                // Creates a pending voucher request for admin review
-                await addDoc(collection(db, "vouchers"), {
+                // 1. Add to Firestore
+                const docRef = await addDoc(collection(db, "vouchers"), {
                     title: "🎂 Birthday Special Gift / Voucher Claim",
                     cost: 0,
                     claimedBy: data.student.name,
@@ -105,7 +112,7 @@
                     createdAt: new Date().toISOString()
                 });
 
-                // Record in transactions log
+                // 2. Add to transaction log
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
                     student: data.student.name,
@@ -114,6 +121,20 @@
                     amount: 'RM 0.00',
                     starsChange: '0 ⭐ (Birthday Special)'
                 });
+
+                // 3. Immediately update local data & refresh UI
+                if (!window.portalData.vouchers) window.portalData.vouchers = [];
+                window.portalData.vouchers.push({
+                    id: docRef.id,
+                    title: "🎂 Birthday Special Gift / Voucher Claim",
+                    claimedBy: data.student.name,
+                    family: data.student.family,
+                    status: 'Pending Approval',
+                    isBirthdayPerk: true,
+                    claimYear: new Date().getFullYear()
+                });
+
+                updatePortalUI(); // Force immediate refresh!
 
                 alert(`🎉 Happy Birthday ${data.student.name}! Your birthday reward request has been submitted to admin. Please collect your gift/voucher at the front desk!`);
             } catch (err) {
@@ -387,20 +408,19 @@
                 <span class="px-3 py-1.5 border text-xs font-bold rounded-lg ${s.name === data.student.name ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700'}">${s.name} (${s.contact})</span>
             `).join('');
 
-            // 🎂 CHECK BIRTHDAY MONTH LOGIC
-            const currentYear = new Date().getFullYear();
-            const currentMonth = new Date().getMonth() + 1; // 1 - 12
+            // 🎂 BIRTHDAY MONTH LOGIC & CLAIM STATUS CHECK
+            const currentMonth = new Date().getMonth() + 1;
             const studentDob = data.student.dob || '';
             const studentMonth = studentDob ? parseInt(studentDob.split('-')[1]) : null;
             
             const birthdayBannerContainer = document.getElementById('birthday-reward-banner-container');
             if (birthdayBannerContainer) {
                 if (studentMonth === currentMonth) {
-                    // Check if this student already requested or received their birthday perk
-                    const existingClaim = data.vouchers.find(v => {
-                        const nameMatches = v.claimedBy === data.student.name || v.student === data.student.name;
-                        const isBirthday = v.isBirthdayPerk || (v.title && v.title.toLowerCase().includes("birthday"));
-                        return nameMatches && isBirthday;
+                    // Check local vouchers array
+                    const existingClaim = (data.vouchers || []).find(v => {
+                        const isStudentMatch = (v.claimedBy === data.student.name || v.student === data.student.name);
+                        const isBirthdayMatch = v.isBirthdayPerk || (v.title && v.title.toLowerCase().includes("birthday"));
+                        return isStudentMatch && isBirthdayMatch;
                     });
 
                     let buttonText = "🎁 Claim Birthday Perk";
@@ -421,8 +441,6 @@
                             buttonAction = "void(0)";
                             buttonStyle = "bg-white text-emerald-600 cursor-default font-extrabold";
                             subText = "Your birthday perk has been approved! Please visit the front desk to enjoy your gift.";
-                        }
-                    }
                     
                     birthdayBannerContainer.innerHTML = `
                         <div class="bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 p-5 rounded-2xl text-white shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
