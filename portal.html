@@ -91,54 +91,54 @@
             });
         }
 
-        // 🎂 BIRTHDAY REWARD CLAIM FUNCTION
+  // 🎂 BIRTHDAY REWARD CLAIM FUNCTION (INSTANT CLAIM)
         window.claimBirthdayReward = async function() {
-            const data = window.portalData;
-            if (!data || !data.student || !data.student.name) {
+            const portal = window.portalData;
+            if (!portal || !portal.student || !portal.student.name) {
                 alert("Student profile not loaded. Please wait a moment or reload.");
                 return;
             }
 
             try {
-                // 1. Add voucher request to Firestore
+                // 1. Create active voucher in Firestore
                 const docRef = await addDoc(collection(db, "vouchers"), {
-                    title: "🎂 Birthday Special Gift / Voucher Claim",
+                    title: "🎁 Birthday Special Gift Perk",
                     cost: 0,
-                    claimedBy: data.student.name,
-                    family: data.student.family || '',
-                    status: 'Pending Approval',
+                    claimedBy: portal.student.name,
+                    family: portal.student.family || '',
+                    status: 'Available to Redeem', // Instantly available!
                     isBirthdayPerk: true,
                     claimYear: new Date().getFullYear(),
                     createdAt: new Date().toISOString()
                 });
 
-                // 2. Add transaction record to Firestore
+                // 2. Log in transaction history
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
-                    student: data.student.name,
-                    family: data.student.family || '',
+                    student: portal.student.name,
+                    family: portal.student.family || '',
                     desc: 'Claimed Birthday Month Gift / Perk',
                     amount: 'RM 0.00',
                     starsChange: '0 ⭐ (Birthday Special)'
                 });
 
-                // 3. Immediately update local portalData array for instant UI refresh
+                // 3. Immediately update local data & UI
                 if (!window.portalData.vouchers) window.portalData.vouchers = [];
                 window.portalData.vouchers.push({
                     id: docRef.id,
-                    title: "🎂 Birthday Special Gift / Voucher Claim",
-                    claimedBy: data.student.name,
-                    family: data.student.family || '',
-                    status: 'Pending Approval',
+                    title: "🎁 Birthday Special Gift Perk",
+                    claimedBy: portal.student.name,
+                    family: portal.student.family || '',
+                    status: 'Available to Redeem',
                     isBirthdayPerk: true,
                     claimYear: new Date().getFullYear()
                 });
 
-                updatePortalUI(); // Force immediate UI refresh
+                updatePortalUI(); // Instantly update banner & rewards list
 
-                alert(`🎉 Happy Birthday ${data.student.name}! Your birthday reward request has been submitted to admin.`);
+                alert(`🎉 Happy Birthday ${portal.student.name}! Your birthday gift voucher has been claimed. Please show your portal at the front desk to collect your gift!`);
             } catch (err) {
-                console.error("Exact error claiming birthday reward: ", err);
+                console.error("Error claiming birthday reward: ", err);
                 alert("Error claiming birthday reward: " + err.message);
             }
         };
@@ -408,61 +408,56 @@
                 <span class="px-3 py-1.5 border text-xs font-bold rounded-lg ${s.name === data.student.name ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700'}">${s.name} (${s.contact})</span>
             `).join('');
 
-           // 🎂 BIRTHDAY MONTH LOGIC & CLAIM STATUS CHECK
+  // 🎂 BIRTHDAY MONTH LOGIC & CLAIM STATUS CHECK
+            const portal = window.portalData;
             const currentMonth = new Date().getMonth() + 1;
-            const studentDob = data.student ? (data.student.dob || '') : '';
+            const studentDob = (portal && portal.student) ? (portal.student.dob || '') : '';
             const studentMonth = studentDob ? parseInt(studentDob.split('-')[1]) : null;
             
             const birthdayBannerContainer = document.getElementById('birthday-reward-banner-container');
-            if (birthdayBannerContainer) {
+            if (birthdayBannerContainer && portal && portal.student) {
                 if (studentMonth === currentMonth) {
-                    const studentName = (data.student && data.student.name) ? data.student.name.trim().toLowerCase() : '';
+                    const activeStudentName = portal.student.name.trim().toLowerCase();
 
-                    // Flexible match for any voucher belonging to this student containing "birthday"
-                    const existingClaim = (data.vouchers || []).find(v => {
+                    // Look for existing birthday claim document
+                    const existingClaim = (portal.vouchers || []).find(v => {
                         const vName = (v.claimedBy || v.student || v.studentName || '').trim().toLowerCase();
                         const vTitle = (v.title || '').toLowerCase();
                         
-                        const isStudentMatch = vName === studentName;
-                        const isBirthdayMatch = v.isBirthdayPerk === true || vTitle.includes("birthday");
-
-                        return isStudentMatch && isBirthdayMatch;
+                        return vName === activeStudentName && (v.isBirthdayPerk === true || vTitle.includes("birthday"));
                     });
 
                     let buttonText = "🎁 Claim Birthday Perk";
                     let buttonAction = "claimBirthdayReward()";
-                    let buttonStyle = "bg-white text-pink-600 hover:bg-pink-50";
+                    let buttonStyle = "bg-white text-pink-600 hover:bg-pink-50 cursor-pointer";
                     let subText = "You have an exclusive birthday perk available (Gift / Special Voucher)! Click below to claim.";
 
                     if (existingClaim) {
                         const statusLower = (existingClaim.status || '').toLowerCase();
 
-                        if (statusLower.includes('pending')) {
-                            buttonText = "⏳ Claim Pending Admin Approval";
+                        if (statusLower.includes('redeemed') || statusLower.includes('used')) {
+                            buttonText = "✓ Birthday Perk Collected";
                             buttonAction = "void(0)";
-                            buttonStyle = "bg-white/80 text-pink-700 cursor-not-allowed opacity-90";
-                            subText = "Your birthday perk request has been submitted and is currently pending admin approval.";
-                        } else if (statusLower.includes('approve') || statusLower.includes('redeem')) {
-                            buttonText = "✓ Birthday Perk Approved!";
-                            buttonAction = "void(0)";
-                            buttonStyle = "bg-white text-emerald-600 cursor-default font-extrabold";
-                            subText = "Your birthday perk has been approved! Please visit the front desk to enjoy your gift.";
+                            buttonStyle = "bg-white/80 text-pink-200 cursor-default opacity-80";
+                            subText = "You have already collected your birthday gift. Happy Birthday!";
                         } else {
-                            buttonText = `Status: ${existingClaim.status}`;
+                            // Status is 'Available to Redeem' or similar
+                            buttonText = "🎁 Reward Claimed (Show at Front Desk)";
                             buttonAction = "void(0)";
-                            buttonStyle = "bg-white text-slate-700 cursor-default font-bold";
+                            buttonStyle = "bg-white text-emerald-600 cursor-default font-extrabold shadow-md";
+                            subText = "Gift voucher added to your rewards! Please present this page at the front desk to receive your gift.";
                         }
                     }
-                    
+
                     birthdayBannerContainer.innerHTML = `
                         <div class="bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 p-5 rounded-2xl text-white shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                             <div>
                                 <span class="bg-white/20 text-white font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full">🎉 Birthday Month Perk</span>
-                                <h3 class="text-lg font-bold mt-1">Happy Birthday Month, ${data.student.name}! 🎂</h3>
-                                <p class="text-xs text-pink-100 mt-0.5">You have an exclusive birthday perk available (Gift / Special Voucher)! Click below to claim.</p>
+                                <h3 class="text-lg font-bold mt-1">Happy Birthday Month, ${portal.student.name}! 🎂</h3>
+                                <p class="text-xs text-pink-100 mt-0.5">${subText}</p>
                             </div>
-                            <button onclick="claimBirthdayReward()" class="px-5 py-2.5 bg-white text-pink-600 font-extrabold text-xs rounded-xl shadow-md hover:bg-pink-50 transition whitespace-nowrap">
-                                🎁 Claim Birthday Perk
+                            <button onclick="${buttonAction}" class="px-5 py-2.5 font-extrabold text-xs rounded-xl shadow-md transition whitespace-nowrap ${buttonStyle}">
+                                ${buttonText}
                             </button>
                         </div>
                     `;
