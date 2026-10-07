@@ -417,23 +417,31 @@
         }
 
         function renderMyRewards() {
-            const portal = window.portalData;
+            const data = window.portalData;
             const grid = document.getElementById('my-rewards-grid');
-            const badge = document.getElementById('my-rewards-badge'); 
-            if (!grid || !portal || !portal.student) return;
+            const badge = document.getElementById('my-rewards-badge');
 
-            const studentName = portal.student.name.trim().toLowerCase();
-            
-            // Filter active vouchers for the active student
-            const activeVouchers = (portal.vouchers || []).filter(v => {
-                const vName = (v.claimedBy || v.student || v.studentName || '').trim().toLowerCase();
+            if (!grid || !data) return;
+
+            const studentName = (data.student?.name || '').trim().toLowerCase();
+            const familyId = (data.student?.family || data.family?.id || '').trim();
+
+            // Flexible Filter: Matches by student name OR family ID, and ignores used/redeemed vouchers
+            const activeVouchers = (data.vouchers || []).filter(v => {
+                const vStudent = (v.claimedBy || v.student || v.studentName || '').trim().toLowerCase();
+                const vFamily = (v.family || v.familyId || '').trim();
                 const statusLower = (v.status || '').toLowerCase();
-                
-                // Show active/available vouchers that match this student
-                return vName === studentName && (statusLower.includes('available') || statusLower.includes('active') || statusLower.includes('pending'));
+
+                // 1. Must match student name OR family ID
+                const belongsToUser = (vStudent === studentName) || (vStudent === '') || (familyId && vFamily === familyId);
+
+                // 2. Must not be used or redeemed
+                const isNotUsed = !statusLower.includes('used') && !statusLower.includes('redeemed');
+
+                return belongsToUser && isNotUsed;
             });
-            
-            // Update Tab Badge Count if badge element exists
+
+            // Update notification badge count
             if (badge) {
                 if (activeVouchers.length > 0) {
                     badge.innerText = activeVouchers.length;
@@ -442,32 +450,33 @@
                     badge.classList.add('hidden');
                 }
             }
-            
-            // Display Empty State
+
+            // Empty state
             if (activeVouchers.length === 0) {
                 grid.innerHTML = `
                     <div class="col-span-full text-center py-10 text-slate-400">
-                        <p class="text-4xl mb-2">🎟️</p>
+                        <p class="text-3xl mb-2">🎟️</p>
                         <p class="text-sm font-semibold text-slate-600">No active vouchers available</p>
                         <p class="text-xs text-slate-400 mt-1">Claim your birthday perk or redeem rewards with your stars!</p>
                     </div>
                 `;
                 return;
             }
-            // Render Voucher Cards
+
+            // Render voucher cards
             grid.innerHTML = activeVouchers.map(v => {
                 const isBirthday = v.isBirthdayPerk || (v.title && v.title.toLowerCase().includes('birthday'));
-                const discountText = v.discountAmount ? `RM ${v.discountAmount} OFF Workshop` : 'Special Perk / Gift';
-                
+                const discountText = v.discountAmount ? `RM ${v.discountAmount} OFF Workshop` : (v.description || 'Special Perk / Gift');
+
                 return `
                     <div class="p-4 rounded-2xl border ${isBirthday ? 'border-pink-200 bg-gradient-to-r from-pink-50 to-rose-50' : 'border-indigo-100 bg-slate-50'} flex justify-between items-center shadow-sm">
                         <div>
                             <span class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${isBirthday ? 'bg-pink-100 text-pink-700' : 'bg-indigo-100 text-indigo-700'}">
                                 ${isBirthday ? '🎉 Birthday Perk' : '⭐ Star Reward'}
                             </span>
-                            <h4 class="font-bold text-sm text-slate-800 mt-1.5">${v.title}</h4>
+                            <h4 class="font-bold text-sm text-slate-800 mt-1.5">${v.title || 'Reward Voucher'}</h4>
                             <p class="text-xs text-slate-500 font-medium mt-0.5">${discountText}</p>
-                            <p class="text-[10px] text-slate-400 mt-1">Status: <span class="font-bold text-emerald-600">${v.status || 'Available to Redeem'}</span></p>
+                            <p class="text-[10px] text-slate-400 mt-1">Status: <span class="font-bold text-emerald-600">${v.status || 'Available'}</span></p>
                         </div>
                         <div class="text-right">
                             <span class="block text-[10px] font-bold text-slate-400 uppercase">Voucher Code</span>
