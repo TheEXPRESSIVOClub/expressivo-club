@@ -394,7 +394,7 @@
                         displayPriceHtml = `<span class="line-through text-slate-400">RM ${basePrice.toFixed(2)}</span> <span class="text-emerald-600 font-bold">RM ${effectivePrice.toFixed(2)} (10% Off)</span>`;
                     }
 
-                    const calculatedStars = Math.floor(effectivePrice / 2);
+                    const calculatedStars = (basePrice > 0) ? Math.floor(basePrice / 2) : 0;
 
                     return `
                         <div class="bg-slate-50 p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
