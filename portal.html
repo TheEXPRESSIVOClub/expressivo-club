@@ -143,33 +143,37 @@
             }
         };
 
-        window.claimVoucher = async function(title, cost) {
+        window.claimVoucher = async function(title, cost, discountAmount = 5) {
             const data = window.portalData;
             if (!data.student || !data.family) {
                 alert("Please select a valid student account first.");
                 return;
             }
             const currentStars = data.family?.stars ?? 100;
-
+            
             if (currentStars < cost) {
                 alert(`Insufficient stars! You need ${cost} stars, but you currently have ${currentStars} stars.`);
                 return;
             }
-
+            
             try {
                 const newStars = currentStars - cost;
+                
+                // 1. Deduct stars from family
                 await updateDoc(doc(db, "families", data.student.family), { stars: newStars });
-
-                // 👈 Updated voucher status to 'Pending Approval' so it shows up in your admin review queue
-                await addDoc(collection(db, "vouchers"), {
+                
+                // 2. Add active voucher to Firestore
+                const docRef = await addDoc(collection(db, "vouchers"), {
                     title: title,
                     cost: cost,
+                    discountAmount: discountAmount, // Saved so workshop booking can calculate the discount!
                     claimedBy: data.student.name,
                     family: data.student.family,
-                    status: 'Pending Approval',
+                    status: 'Available', // Instantly active & ready to use under My Rewards
                     createdAt: new Date().toISOString()
                 });
 
+                // 3. Add transaction log
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
                     student: data.student.name,
@@ -179,7 +183,25 @@
                     starsChange: `-${cost} ⭐`
                 });
 
-                alert(`Reward "${title}" claimed successfully! Awaiting admin approval.`);
+                // 4. Update local memory so UI refreshes immediately
+                if (data.family) data.family.stars = newStars;
+                if (!data.vouchers) data.vouchers = [];
+
+                data.vouchers.push({
+                    id: docRef.id,
+                    title: title,
+                    cost: cost,
+                    discountAmount: discountAmount,
+                    claimedBy: data.student.name,
+                    family: data.student.family,
+                    status: 'Available'
+                });
+                
+                // 5. Re-render UI & My Rewards
+                updatePortalUI();
+                if (typeof renderMyRewards === 'function') renderMyRewards();
+
+                alert(`🎉 Reward "${title}" claimed successfully! It is now available under "My Rewards".`);
             } catch (err) {
                 console.error("Error claiming reward: ", err);
                 alert("Error claiming reward. Please try again.");
