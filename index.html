@@ -1110,5 +1110,99 @@
         </div>
 
     </div>
+      
+    // 1. FUNCTION TO RENDER THE TABLE ROWS
+    
+    function renderAdminVouchers() {
+        const tableBody = document.getElementById('admin-vouchers-table');
+        if (!tableBody) return;
+
+        const vouchers = window.adminData?.vouchers || [];
+
+        if (vouchers.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="p-4 text-center text-slate-400 italic">No voucher redemptions found.</td>
+                </tr>`;
+            return;
+        }
+
+        tableBody.innerHTML = vouchers.map(v => {
+            // Dynamic Discount Display
+            let discountDisplay = "RM 0.00";
+            if (v.discountAmount !== undefined && v.discountAmount !== null) {
+                discountDisplay = `RM ${parseFloat(v.discountAmount).toFixed(2)}`;
+            } else if (v.title) {
+                const match = v.title.match(/RM\s*(\d+)/i);
+                if (match) {
+                    discountDisplay = `RM ${parseFloat(match[1]).toFixed(2)}`;
+                } else if (v.title.toLowerCase().includes("free")) {
+                    discountDisplay = "100% OFF";
+                } else if (v.title.toLowerCase().includes("birthday") || v.isBirthdayPerk) {
+                    discountDisplay = "Free Gift Perk";
+                }
+            }
+
+            // Dynamic Action Buttons
+            const statusLower = (v.status || '').toLowerCase();
+            let actionHtml = `<span class="text-slate-400 italic">No action</span>`;
+
+            if (statusLower.includes('available to redeem') || statusLower.includes('pending')) {
+                actionHtml = `
+                    <button onclick="approveVoucher('${v.id}')" class="px-3 py-1 bg-indigo-600 text-white font-bold text-xs rounded-lg hover:bg-indigo-700 transition">
+                        Approve
+                    </button>`;
+            } else if (statusLower.includes('available') || statusLower.includes('approved')) {
+                actionHtml = `
+                    <button onclick="markVoucherUsed('${v.id}')" class="px-3 py-1 bg-emerald-600 text-white font-bold text-xs rounded-lg hover:bg-emerald-700 transition">
+                        Mark Used
+                    </button>`;
+            } else if (statusLower.includes('used')) {
+                actionHtml = `<span class="text-slate-400 font-semibold">Completed ✓</span>`;
+            }
+
+            return `
+                <tr class="border-b border-slate-100 text-xs">
+                    <td class="p-3 font-bold text-slate-800">${v.title || 'Voucher'}</td>
+                    <td class="p-3 font-mono text-slate-600">${v.family || 'N/A'}</td>
+                    <td class="p-3 font-bold text-slate-800">${discountDisplay}</td>
+                    <td class="p-3">
+                        <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold ${
+                            statusLower.includes('used') ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                        }">
+                            ${v.status || 'Available'}
+                        </span>
+                    </td>
+                    <td class="p-3 text-right">${actionHtml}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // 2. GLOBAL BUTTON CLICK HANDLERS
+    window.approveVoucher = async function(docId) {
+        try {
+            const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            const vRef = doc(window.db, "vouchers", docId);
+            await updateDoc(vRef, { status: 'Approved & Available' });
+            alert('Voucher approved successfully!');
+        } catch (err) {
+            console.error("Error approving voucher:", err);
+            alert("Error: " + err.message);
+        }
+    };
+
+    window.markVoucherUsed = async function(docId) {
+        if (!confirm("Are you sure you want to mark this voucher as USED?")) return;
+        try {
+            const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            const vRef = doc(window.db, "vouchers", docId);
+            await updateDoc(vRef, { status: 'Used' });
+            alert('Voucher marked as used!');
+        } catch (err) {
+            console.error("Error marking voucher used:", err);
+            alert("Error: " + err.message);
+        }
+    };
 </body>
 </html>
