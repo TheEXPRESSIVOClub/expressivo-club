@@ -94,52 +94,52 @@
         // 🎂 BIRTHDAY REWARD CLAIM FUNCTION
         window.claimBirthdayReward = async function() {
             const data = window.portalData;
-            if (!data.student || !data.family) {
-                alert("Student profile not loaded.");
+            if (!data || !data.student || !data.student.name) {
+                alert("Student profile not loaded. Please wait a moment or reload.");
                 return;
             }
 
             try {
-                // Creates a pending voucher request for admin review
-                await addDoc(collection(db, "vouchers"), {
+                // 1. Add voucher request to Firestore
+                const docRef = await addDoc(collection(db, "vouchers"), {
                     title: "🎂 Birthday Special Gift / Voucher Claim",
                     cost: 0,
                     claimedBy: data.student.name,
-                    family: data.student.family,
+                    family: data.student.family || '',
                     status: 'Pending Approval',
                     isBirthdayPerk: true,
                     claimYear: new Date().getFullYear(),
                     createdAt: new Date().toISOString()
                 });
 
-                // Record in transactions log
+                // 2. Add transaction record to Firestore
                 await addDoc(collection(db, "transactions"), {
                     date: new Date().toISOString().split('T')[0],
                     student: data.student.name,
-                    family: data.student.family,
+                    family: data.student.family || '',
                     desc: 'Claimed Birthday Month Gift / Perk',
                     amount: 'RM 0.00',
                     starsChange: '0 ⭐ (Birthday Special)'
                 });
 
-                // Immediately update local data & refresh UI
+                // 3. Immediately update local portalData array for instant UI refresh
                 if (!window.portalData.vouchers) window.portalData.vouchers = [];
                 window.portalData.vouchers.push({
                     id: docRef.id,
                     title: "🎂 Birthday Special Gift / Voucher Claim",
                     claimedBy: data.student.name,
-                    family: data.student.family,
+                    family: data.student.family || '',
                     status: 'Pending Approval',
                     isBirthdayPerk: true,
                     claimYear: new Date().getFullYear()
                 });
 
-                updatePortalUI(); // Force immediate refresh!
+                updatePortalUI(); // Force immediate UI refresh
 
-                alert(`🎉 Happy Birthday ${data.student.name}! Your birthday reward request has been submitted to admin. Please collect your gift/voucher at the front desk!`);
+                alert(`🎉 Happy Birthday ${data.student.name}! Your birthday reward request has been submitted to admin.`);
             } catch (err) {
-                console.error("Error claiming birthday reward: ", err);
-                alert("Error claiming birthday reward. Please try again.");
+                console.error("Exact error claiming birthday reward: ", err);
+                alert("Error claiming birthday reward: " + err.message);
             }
         };
 
