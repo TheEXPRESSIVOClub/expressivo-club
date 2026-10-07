@@ -65,11 +65,18 @@
             });
 
             onSnapshot(collection(db, "vouchers"), (snapshot) => {
-                window.appData.vouchers = [];
-                snapshot.forEach((docSnap) => {
-                    window.appData.vouchers.push({ id: docSnap.id, ...docSnap.data() });
-                });
-                updateAdminUI();
+                window.appData = window.appData || {};
+                window.appData.vouchers = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+
+                // Update window.adminData as well so both references work
+                window.adminData = window.appData;
+
+                // Call both UI updates
+                if (typeof renderAdminVouchers === 'function') renderAdminVouchers();
+                if (typeof updateAdminUI === 'function') updateAdminUI();
             });
 
             onSnapshot(collection(db, "transactions"), (snapshot) => {
