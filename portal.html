@@ -100,6 +100,8 @@
                     claimedBy: data.student.name,
                     family: data.student.family,
                     status: 'Pending Approval',
+                    isBirthdayPerk: true,
+                    claimYear: new Date().getFullYear(),
                     createdAt: new Date().toISOString()
                 });
 
@@ -386,6 +388,7 @@
             `).join('');
 
             // 🎂 CHECK BIRTHDAY MONTH LOGIC
+            const currentYear = new Date().getFullYear();
             const currentMonth = new Date().getMonth() + 1; // 1 - 12
             const studentDob = data.student.dob || '';
             const studentMonth = studentDob ? parseInt(studentDob.split('-')[1]) : null;
@@ -393,6 +396,32 @@
             const birthdayBannerContainer = document.getElementById('birthday-reward-banner-container');
             if (birthdayBannerContainer) {
                 if (studentMonth === currentMonth) {
+                    // Check if this student already requested or received their birthday perk this year
+                    const existingClaim = data.vouchers.find(v => 
+                        v.claimedBy === data.student.name && 
+                        (v.isBirthdayPerk || v.title.includes("Birthday")) &&
+                        (v.claimYear === currentYear || (v.createdAt && v.createdAt.startsWith(currentYear.toString())))
+                    );
+
+                    let buttonText = "🎁 Claim Birthday Perk";
+                    let buttonAction = "claimBirthdayReward()";
+                    let buttonStyle = "bg-white text-pink-600 hover:bg-pink-50";
+                    let subText = "You have an exclusive birthday perk available (Gift / Special Voucher)! Click below to claim.";
+
+                    if (existingClaim) {
+                        if (existingClaim.status === 'Pending Approval') {
+                            buttonText = "⏳ Claim Pending Approval";
+                            buttonAction = "void(0)";
+                            buttonStyle = "bg-white/80 text-pink-700 cursor-not-allowed opacity-90";
+                            subText = "Your birthday perk request has been submitted and is currently pending admin approval.";
+                        } else if (existingClaim.status === 'Approved' || existingClaim.status === 'Approved & Available' || existingClaim.status === 'Redeemed') {
+                            buttonText = "✓ Birthday Perk Approved!";
+                            buttonAction = "void(0)";
+                            buttonStyle = "bg-white text-emerald-600 cursor-default font-extrabold";
+                            subText = "Your birthday perk has been approved! Please visit the front desk to enjoy your gift.";
+                        }
+                    }
+                    
                     birthdayBannerContainer.innerHTML = `
                         <div class="bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 p-5 rounded-2xl text-white shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                             <div>
