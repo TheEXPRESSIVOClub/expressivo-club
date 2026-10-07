@@ -29,6 +29,13 @@
         function initPortal() {
             renderRewardsCatalog();
 
+            // Listen to Vouchers Collection
+        onSnapshot(collection(db, "vouchers"), (snapshot) => {
+            window.portalData.vouchers = [];
+            snapshot.forEach(d => window.portalData.vouchers.push({ id: d.id, ...d.data() }));
+            updatePortalUI(); // Updates the UI as soon as vouchers load or change!
+        });
+
             const urlParams = new URLSearchParams(window.location.search);
             const studentParam = urlParams.get('student');
 
@@ -114,6 +121,20 @@
                     amount: 'RM 0.00',
                     starsChange: '0 ⭐ (Birthday Special)'
                 });
+
+                // Immediately update local data & refresh UI
+                if (!window.portalData.vouchers) window.portalData.vouchers = [];
+                window.portalData.vouchers.push({
+                    id: docRef.id,
+                    title: "🎂 Birthday Special Gift / Voucher Claim",
+                    claimedBy: data.student.name,
+                    family: data.student.family,
+                    status: 'Pending Approval',
+                    isBirthdayPerk: true,
+                    claimYear: new Date().getFullYear()
+                });
+
+                updatePortalUI(); // Force immediate refresh!
 
                 alert(`🎉 Happy Birthday ${data.student.name}! Your birthday reward request has been submitted to admin. Please collect your gift/voucher at the front desk!`);
             } catch (err) {
@@ -397,10 +418,10 @@
             if (birthdayBannerContainer) {
                 if (studentMonth === currentMonth) {
                     // Check if this student already requested or received their birthday perk
-                    const existingClaim = data.vouchers.find(v => {
-                        const nameMatches = v.claimedBy === data.student.name || v.student === data.student.name;
-                        const isBirthday = v.isBirthdayPerk || (v.title && v.title.toLowerCase().includes("birthday"));
-                        return nameMatches && isBirthday;
+                    const existingClaim = (data.vouchers || []).find(v => {
+                        const isStudentMatch = (v.claimedBy === data.student.name || v.student === data.student.name);
+                        const isBirthdayMatch = v.isBirthdayPerk || (v.title && v.title.toLowerCase().includes("birthday"));
+                        return isStudentMatch && isBirthdayMatch;
                     });
 
                     let buttonText = "🎁 Claim Birthday Perk";
