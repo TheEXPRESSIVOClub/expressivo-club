@@ -408,19 +408,24 @@
                 <span class="px-3 py-1.5 border text-xs font-bold rounded-lg ${s.name === data.student.name ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700'}">${s.name} (${s.contact})</span>
             `).join('');
 
-            // 🎂 CHECK BIRTHDAY MONTH LOGIC
-            const currentYear = new Date().getFullYear();
-            const currentMonth = new Date().getMonth() + 1; // 1 - 12
-            const studentDob = data.student.dob || '';
+           // 🎂 BIRTHDAY MONTH LOGIC & CLAIM STATUS CHECK
+            const currentMonth = new Date().getMonth() + 1;
+            const studentDob = data.student ? (data.student.dob || '') : '';
             const studentMonth = studentDob ? parseInt(studentDob.split('-')[1]) : null;
             
             const birthdayBannerContainer = document.getElementById('birthday-reward-banner-container');
             if (birthdayBannerContainer) {
                 if (studentMonth === currentMonth) {
-                    // Check if this student already requested or received their birthday perk
+                    const studentName = (data.student && data.student.name) ? data.student.name.trim().toLowerCase() : '';
+
+                    // Flexible match for any voucher belonging to this student containing "birthday"
                     const existingClaim = (data.vouchers || []).find(v => {
-                        const isStudentMatch = (v.claimedBy === data.student.name || v.student === data.student.name);
-                        const isBirthdayMatch = v.isBirthdayPerk || (v.title && v.title.toLowerCase().includes("birthday"));
+                        const vName = (v.claimedBy || v.student || v.studentName || '').trim().toLowerCase();
+                        const vTitle = (v.title || '').toLowerCase();
+                        
+                        const isStudentMatch = vName === studentName;
+                        const isBirthdayMatch = v.isBirthdayPerk === true || vTitle.includes("birthday");
+
                         return isStudentMatch && isBirthdayMatch;
                     });
 
@@ -433,7 +438,7 @@
                         const statusLower = (existingClaim.status || '').toLowerCase();
 
                         if (statusLower.includes('pending')) {
-                            buttonText = "⏳ Claim Pending Approval";
+                            buttonText = "⏳ Claim Pending Admin Approval";
                             buttonAction = "void(0)";
                             buttonStyle = "bg-white/80 text-pink-700 cursor-not-allowed opacity-90";
                             subText = "Your birthday perk request has been submitted and is currently pending admin approval.";
@@ -442,6 +447,10 @@
                             buttonAction = "void(0)";
                             buttonStyle = "bg-white text-emerald-600 cursor-default font-extrabold";
                             subText = "Your birthday perk has been approved! Please visit the front desk to enjoy your gift.";
+                        } else {
+                            buttonText = `Status: ${existingClaim.status}`;
+                            buttonAction = "void(0)";
+                            buttonStyle = "bg-white text-slate-700 cursor-default font-bold";
                         }
                     }
                     
