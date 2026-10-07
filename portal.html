@@ -235,6 +235,11 @@
 
             const tier = data.family?.tier || 'Prelude';
             let basePrice = parseFloat(ws.price) || 0;
+    
+            // 1. FIXED STAR LOGIC: Always calculated from original base price, 
+            // unaffected by tier discounts or vouchers! (RM88 -> 44 stars, Free RM0 -> 0 stars)
+            const starsEarned = (basePrice > 0) ? Math.floor(basePrice / 2) : 0;
+
             let tierDiscountedPrice = basePrice;
             let tierDiscountDesc = '';
 
@@ -246,10 +251,10 @@
                 tierDiscountDesc = ' (10% Virtuoso Tier Discount)';
             }
 
-            // 1. UPDATED VOUCHER FILTER: Matches Available, Active, and Approved vouchers
+            // 2. VOUCHER FILTER: Matches Available, Active, and Approved vouchers
             const familyId = data.student.family;
             const approvedVouchers = (data.vouchers || []).filter(v => {
-                const matchesFamily = v.family === familyId; 
+                const matchesFamily = v.family === familyId;
                 const status = (v.status || '').toLowerCase();
                 const isAvailable = status.includes('available') || status.includes('approved') || status.includes('active');
                 return matchesFamily && isAvailable;
@@ -271,7 +276,6 @@
                     if (idx >= 0 && idx < approvedVouchers.length) {
                         selectedVoucher = approvedVouchers[idx];
 
-                        // Respect discountAmount field if present, or parse title
                         if (selectedVoucher.discountAmount) {
                             voucherDiscountAmount = parseFloat(selectedVoucher.discountAmount);
                         } else if (selectedVoucher.title.includes("RM")) {
@@ -297,16 +301,12 @@
                 return;
             }
 
-            // 2. UPDATED STAR LOGIC:
-            // Stars earned from ORIGINAL price (e.g. RM88 -> 44 stars). Free workshops (RM0) earn 0 stars.
-            const starsEarned = (basePrice > 0) ? Math.floor(basePrice / 2) : 0;
-
             try {
                 registeredList.push(data.student.name);
                 await updateDoc(doc(db, "workshops", wId), { registered: registeredList });
 
-                // 3. Mark voucher as 'Used' so it leaves "My Rewards"
-                if (selectedVoucher) {
+                // 3. Mark voucher as 'Used' so it leaves "My Rewards"  
+                 if (selectedVoucher) {
                     await updateDoc(doc(db, "vouchers", selectedVoucher.id), { 
                         status: 'Used',
                         usedAt: new Date().toISOString() 
@@ -315,7 +315,7 @@
 
                 const newWalletBalance = currentWallet - finalPrice;
                 const currentStars = Number(data.family?.stars ?? 100);
-                const newStarsBalance = currentStars + starsEarned;        
+                const newStarsBalance = currentStars + starsEarned;
 
                 await updateDoc(doc(db, "families", familyId), { 
                     wallet: newWalletBalance,
