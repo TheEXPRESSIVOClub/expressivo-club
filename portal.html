@@ -396,12 +396,12 @@
             const birthdayBannerContainer = document.getElementById('birthday-reward-banner-container');
             if (birthdayBannerContainer) {
                 if (studentMonth === currentMonth) {
-                    // Check if this student already requested or received their birthday perk this year
-                    const existingClaim = data.vouchers.find(v => 
-                        v.claimedBy === data.student.name && 
-                        (v.isBirthdayPerk || v.title.includes("Birthday")) &&
-                        (v.claimYear === currentYear || (v.createdAt && v.createdAt.startsWith(currentYear.toString())))
-                    );
+                    // Check if this student already requested or received their birthday perk
+                    const existingClaim = data.vouchers.find(v => {
+                        const nameMatches = v.claimedBy === data.student.name || v.student === data.student.name;
+                        const isBirthday = v.isBirthdayPerk || (v.title && v.title.toLowerCase().includes("birthday"));
+                        return nameMatches && isBirthday;
+                    });
 
                     let buttonText = "🎁 Claim Birthday Perk";
                     let buttonAction = "claimBirthdayReward()";
@@ -409,12 +409,14 @@
                     let subText = "You have an exclusive birthday perk available (Gift / Special Voucher)! Click below to claim.";
 
                     if (existingClaim) {
-                        if (existingClaim.status === 'Pending Approval') {
+                        const statusLower = (existingClaim.status || '').toLowerCase();
+
+                        if (statusLower.includes('pending')) {
                             buttonText = "⏳ Claim Pending Approval";
                             buttonAction = "void(0)";
                             buttonStyle = "bg-white/80 text-pink-700 cursor-not-allowed opacity-90";
                             subText = "Your birthday perk request has been submitted and is currently pending admin approval.";
-                        } else if (existingClaim.status === 'Approved' || existingClaim.status === 'Approved & Available' || existingClaim.status === 'Redeemed') {
+                        } else if (statusLower.includes('approve') || statusLower.includes('redeem')) {
                             buttonText = "✓ Birthday Perk Approved!";
                             buttonAction = "void(0)";
                             buttonStyle = "bg-white text-emerald-600 cursor-default font-extrabold";
