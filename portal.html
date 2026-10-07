@@ -29,12 +29,17 @@
         function initPortal() {
             renderRewardsCatalog();
 
-            // Listen to Vouchers Collection
-        onSnapshot(collection(db, "vouchers"), (snapshot) => {
-            window.portalData.vouchers = [];
-            snapshot.forEach(d => window.portalData.vouchers.push({ id: d.id, ...d.data() }));
-            updatePortalUI(); // Updates the UI as soon as vouchers load or change!
-        });
+            // Listen to vouchers collection in real-time so they never disappear on refresh
+            onSnapshot(collection(db, "vouchers"), (snapshot) => {
+                window.portalData.vouchers = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+
+                // Instantly refresh UI & My Rewards when data arrives
+                if (typeof updatePortalUI === 'function') updatePortalUI();
+                if (typeof renderMyRewards === 'function') renderMyRewards();
+            });
 
             const urlParams = new URLSearchParams(window.location.search);
             const studentParam = urlParams.get('student');
