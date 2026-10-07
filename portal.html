@@ -246,15 +246,20 @@
                 tierDiscountDesc = ' (10% Virtuoso Tier Discount)';
             }
 
-            // Checks for Approved Vouchers under the family's ID
+            // 1. UPDATED VOUCHER FILTER: Matches Available, Active, and Approved vouchers
             const familyId = data.student.family;
-            const approvedVouchers = data.vouchers.filter(v => v.family === familyId && (v.status === 'Approved & Available' || v.status === 'Approved'));
+            const approvedVouchers = (data.vouchers || []).filter(v => {
+                const matchesFamily = v.family === familyId; 
+                const status = (v.status || '').toLowerCase();
+                const isAvailable = status.includes('available') || status.includes('approved') || status.includes('active');
+                return matchesFamily && isAvailable;
+            });
 
             let selectedVoucher = null;
             let voucherDiscountAmount = 0;
 
             if (approvedVouchers.length > 0) {
-                let promptText = "You have the following Approved Vouchers available:\n0: Do not use a voucher\n";
+                let promptText = "You have the following Vouchers available:\n0: Do not use a voucher\n";
                 approvedVouchers.forEach((v, index) => {
                     promptText += `${index + 1}: ${v.title}\n`;
                 });
@@ -265,14 +270,18 @@
                     const idx = parseInt(choice.trim()) - 1;
                     if (idx >= 0 && idx < approvedVouchers.length) {
                         selectedVoucher = approvedVouchers[idx];
-                        if (selectedVoucher.title.includes("RM")) {
-                            const match = selectedVoucher.title.match(/RM(\d+)/);
+
+                        // Respect discountAmount field if present, or parse title
+                        if (selectedVoucher.discountAmount) {
+                            voucherDiscountAmount = parseFloat(selectedVoucher.discountAmount);
+                        } else if (selectedVoucher.title.includes("RM")) {
+                            const match = selectedVoucher.title.match(/RM\s*(\d+)/i);
                             if (match) {
                                 voucherDiscountAmount = parseFloat(match[1]);
                             }
                         } else if (selectedVoucher.title.includes("50%")) {
                             voucherDiscountAmount = tierDiscountedPrice * 0.50;
-                        } else if (selectedVoucher.title.includes("FREE")) {
+                        } else if (selectedVoucher.title.toUpperCase().includes("FREE")) {
                             voucherDiscountAmount = tierDiscountedPrice;
                         }
                     }
@@ -288,19 +297,25 @@
                 return;
             }
 
-            const starsEarned = Math.floor(finalPrice / 2);
+            // 2. UPDATED STAR LOGIC:
+            // Stars earned from ORIGINAL price (e.g. RM88 -> 44 stars). Free workshops (RM0) earn 0 stars.
+            const starsEarned = (basePrice > 0) ? Math.floor(basePrice / 2) : 0;
 
             try {
                 registeredList.push(data.student.name);
                 await updateDoc(doc(db, "workshops", wId), { registered: registeredList });
 
+                // 3. Mark voucher as 'Used' so it leaves "My Rewards"
                 if (selectedVoucher) {
-                    await updateDoc(doc(db, "vouchers", selectedVoucher.id), { status: 'Redeemed' });
+                    await updateDoc(doc(db, "vouchers", selectedVoucher.id), { 
+                        status: 'Used',
+                        usedAt: new Date().toISOString() 
+                    });
                 }
 
                 const newWalletBalance = currentWallet - finalPrice;
                 const currentStars = Number(data.family?.stars ?? 100);
-                const newStarsBalance = currentStars + starsEarned;
+                const newStarsBalance = currentStars + starsEarned;        
 
                 await updateDoc(doc(db, "families", familyId), { 
                     wallet: newWalletBalance,
@@ -317,6 +332,11 @@
                 });
 
                 alert(`Successfully booked ${ws.title}! Paid RM ${finalPrice.toFixed(2)}${tierDiscountDesc}${voucherDesc} from your wallet. (+${starsEarned} Stars earned)`);
+
+                // Refresh UI
+                if (typeof updatePortalUI === 'function') updatePortalUI();
+                if (typeof renderMyRewards === 'function') renderMyRewards();
+
             } catch (err) {
                 console.error("Error registering workshop: ", err);
                 alert("Error processing workshop booking.");
