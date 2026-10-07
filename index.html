@@ -1117,14 +1117,15 @@
         </div>
 
     </div>
-      
+
+    <script type="module">
+
     // 1. FUNCTION TO RENDER THE TABLE ROWS
-    
     function renderAdminVouchers() {
         const tableBody = document.getElementById('admin-vouchers-table');
         if (!tableBody) return;
 
-        const vouchers = window.adminData?.vouchers || [];
+        const vouchers = window.appData?.vouchers || window.adminData?.vouchers || [];
 
         if (vouchers.length === 0) {
             tableBody.innerHTML = `
@@ -1211,5 +1212,7 @@
             alert("Error: " + err.message);
         }
     };
-</body>
-</html>
+
+    </script>
+    </body>
+    </html>
