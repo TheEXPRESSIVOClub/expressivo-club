@@ -621,7 +621,7 @@
         
     <script>
         function switchTab(tab) {
-            ['dashboard', 'rewards', 'workshops'].forEach(t => {
+            ['dashboard', 'rewards', 'workshops', 'my-rewards'].forEach(t => {
                 document.getElementById(`content-${t}`).classList.add('hidden');
                 document.getElementById(`tab-${t}`).className = "px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap";
             });
