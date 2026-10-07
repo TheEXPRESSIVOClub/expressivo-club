@@ -396,31 +396,22 @@
                 }).join('');
         }
 
-        function populateBookingVouchers(studentName) {
-            const voucherSelect = document.getElementById('booking-voucher-select');
-            if (!voucherSelect || !window.portalData) return;
+        function renderMyRewards() {
+            const portal = window.portalData;
+            const grid = document.getElementById('my-rewards-grid');
+            const badge = document.getElementById('my-rewards-badge'); 
+            if (!grid || !portal || !portal.student) return;
 
-            const currentStudent = (studentName || '').trim().toLowerCase();
-
-            // Filter available vouchers for this student
-            const activeVouchers = (window.portalData.vouchers || []).filter(v => {
-                const vStudent = (v.claimedBy || v.student || v.studentName || '').trim().toLowerCase();
-                const statusLower = (v.status || '').toLowerCase(); 
-        
-                return vStudent === currentStudent && (statusLower.includes('available') || statusLower.includes('active'));
+            const studentName = portal.student.name.trim().toLowerCase();
+            
+            // Filter active vouchers for the active student
+            const activeVouchers = (portal.vouchers || []).filter(v => {
+                const vName = (v.claimedBy || v.student || v.studentName || '').trim().toLowerCase();
+                const statusLower = (v.status || '').toLowerCase();
+                
+                // Show active/available vouchers that match this student
+                return vName === studentName && (statusLower.includes('available') || statusLower.includes('active') || statusLower.includes('pending'));
             });
-
-            if (activeVouchers.length === 0) {
-                voucherSelect.innerHTML = `<option value="">No available vouchers found</option>`;
-                return;
-            }
-
-            voucherSelect.innerHTML = `<option value="">No Voucher Applied (Full Price)</option>` + 
-                activeVouchers.map(v => {
-                    const discount = v.discountAmount || 5;
-                    return `<option value="${v.id}" data-discount="${discount}">${v.title} (-RM ${discount}.00)</option>`;
-                }).join('');
-        }
             
             // Update Tab Badge Count if badge element exists
             if (badge) {
