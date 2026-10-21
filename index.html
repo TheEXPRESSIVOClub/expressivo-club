@@ -1155,118 +1155,119 @@
     <!-- JAVASCRIPT LOGIC BLOCK                    -->
     <!-- ========================================== -->
     <script type="module">
-        // 1. FUNCTION TO RENDER VOUCHERS TABLE
-        function renderAdminVouchers() {
-            const tableBody = document.getElementById('admin-vouchers-table');
-            if (!tableBody) return;
+    // 1. FUNCTION TO RENDER VOUCHERS TABLE
+    function renderAdminVouchers() {
+        const tableBody = document.getElementById('admin-vouchers-table');
+        if (!tableBody) return;
 
-            const vouchers = window.appData?.vouchers || window.adminData?.vouchers || [];
+        const vouchers = window.appData?.vouchers || window.adminData?.vouchers || [];
 
-            if (vouchers.length === 0) {
-                tableBody.innerHTML = `
-                    <tr>
-                        <td colspan="5" class="p-4 text-center text-slate-400 italic">No voucher redemptions found.</td>
-                    </tr>`;
-                return;
-            }
+        if (vouchers.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="p-4 text-center text-slate-400 italic">No voucher redemptions found.</td>
+                </tr>`;
+            return;
+        }
 
-            tableBody.innerHTML = vouchers.map(v => {
-                // Dynamic Discount Value Calculation
-                let discountDisplay = '';
-                const titleText = v.title || v.voucherTitle || '';
+        tableBody.innerHTML = vouchers.map(v => {
+            // Dynamic Discount Value Calculation
+            let discountDisplay = '';
+            const rawTitle = v.title || v.voucherTitle || '';
+            const titleLower = rawTitle.toLowerCase();
 
-                // 1. Check for Birthday Perk
-                if (titleText.toLowerCase().includes('birthday') || v.isBirthdayPerk) {
-                  discountDisplay = `
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+            // 1. Check for Birthday Perk
+            if (titleLower.includes('birthday') || v.isBirthdayPerk) {
+                discountDisplay = `
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800">
                       🎂 ${v.currentMonthPerk || v.giftDescription || 'Variable Monthly Gift'}
                     </span>
                   `;
-                } 
-                // 2. Read explicit discountAmount or title amount (e.g., RM5)
-                else {
-                  const rawAmount = v.discountAmount !== undefined ? v.discountAmount : (v.amount !== undefined ? v.amount : v.value);
+            } 
+            // 2. Read explicit discountAmount or title amount (e.g., RM5, RM10)
+            else {
+                const rawAmount = v.discountAmount !== undefined ? v.discountAmount : (v.amount !== undefined ? v.amount : v.value);
   
-                  if (rawAmount !== undefined && rawAmount !== null && !isNaN(rawAmount)) {
+                if (rawAmount !== undefined && rawAmount !== null && !isNaN(rawAmount)) {
                     discountDisplay = `<span class="text-sm font-semibold text-gray-900">RM ${parseFloat(rawAmount).toFixed(2)}</span>`;
-                  } else if (titleText.match(/RM\s*(\d+(?:\.\d+)?)/i)) {
-                    const match = titleText.match(/RM\s*(\d+(?:\.\d+)?)/i);
+                } else if (rawTitle.match(/RM\s*(\d+(?:\.\d+)?)/i)) {
+                    const match = rawTitle.match(/RM\s*(\d+(?:\.\d+)?)/i);
                     discountDisplay = `<span class="text-sm font-semibold text-gray-900">RM ${parseFloat(match[1]).toFixed(2)}</span>`;
-                  } else if (titleText.toLowerCase().includes('free')) {
+                } else if (titleLower.includes('free')) {
                     discountDisplay = `<span class="text-sm font-semibold text-gray-900">100% OFF</span>`;
-                  } else {
+                } else {
                     discountDisplay = `<span class="text-sm text-gray-500">N/A</span>`;
-                  }
                 }
+            }
 
-                // Dynamic Action Button Matching
-                const statusText = (v.status || '').trim();
-                const statusLower = statusText.toLowerCase();
-                let actionHtml = `<span class="text-slate-400 italic">No action</span>`;
+            // 3. Conditional Action Logic: Only Birthday / Merchandise require admin clicks
+            const statusText = (v.status || '').trim();
+            const statusLower = statusText.toLowerCase();
+            const requiresApproval = titleLower.includes('birthday') || titleLower.includes('merchandise') || v.requiresApproval;
 
-                if (statusLower === 'available to redeem' || statusLower === 'pending') {
-                    actionHtml = `
-                        <button onclick="approveVoucher('${v.id}')" class="px-3 py-1 bg-indigo-600 text-white font-bold text-xs rounded-lg hover:bg-indigo-700 transition">
-                            Approve
-                        </button>`;
-                } else if (statusLower === 'available' || statusLower === 'approved' || statusLower === 'approved & available') {
-                    actionHtml = `
-                        <button onclick="markVoucherUsed('${v.id}')" class="px-3 py-1 bg-emerald-600 text-white font-bold text-xs rounded-lg hover:bg-emerald-700 transition">
-                            Mark Used
-                        </button>`;
-                } else if (statusLower === 'used') {
-                    actionHtml = `<span class="text-slate-400 font-semibold">Completed ✓</span>`;
-                }
+            let actionHtml = `<span class="text-slate-400 text-xs italic">Auto-Active</span>`;
 
-                return `
-                    <tr class="border-b border-slate-100 text-xs">
-                        <td class="p-3 font-bold text-slate-800">${v.title || 'Voucher'}</td>
-                        <td class="p-3 font-mono text-slate-600">${v.family || v.familyId || 'N/A'}</td>
-                        <td class="p-3 font-bold text-slate-800">${discountDisplay}</td>
-                        <td class="p-3">
-                            <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold ${
-                                statusLower === 'used' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                            }">
-                                ${v.status || 'Available'}
-                            </span>
-                        </td>
-                        <td class="p-3 text-right">${actionHtml}</td>
-                    </tr>
-                `;
-            }).join('');
+            if (requiresApproval && (statusLower === 'available to redeem' || statusLower === 'pending')) {
+                actionHtml = `
+                    <button onclick="approveVoucher('${v.id}')" class="px-3 py-1 bg-indigo-600 text-white font-bold text-xs rounded-lg hover:bg-indigo-700 transition">
+                        Approve Perk
+                    </button>`;
+            } else if (requiresApproval) {
+                actionHtml = `<span class="text-purple-600 text-xs font-semibold">Approved</span>`;
+            } else if (statusLower === 'used') {
+                actionHtml = `<span class="text-slate-400 font-semibold">Completed ✓</span>`;
+            }
+
+            return `
+                <tr class="border-b border-slate-100 text-xs">
+                    <td class="p-3 font-bold text-slate-800">${rawTitle || 'Voucher'}</td>
+                    <td class="p-3 font-mono text-slate-600">${v.family || v.familyId || 'N/A'}</td>
+                    <td class="p-3 font-bold text-slate-800">${discountDisplay}</td>
+                    <td class="p-3">
+                        <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold ${
+                            statusLower === 'used' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                        }">
+                            ${v.status || 'Active'}
+                        </span>
+                    </td>
+                    <td class="p-3 text-right">${actionHtml}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    window.renderAdminVouchers = renderAdminVouchers;
+
+    // 2. GLOBAL ACTION HANDLERS WITH PAGE RELOAD
+    window.approveVoucher = async function(docId) {
+        try {
+            const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            if (!window.db) throw new Error("Database reference not initialized.");
+            const vRef = doc(window.db, "vouchers", docId);
+            await updateDoc(vRef, { status: 'Approved & Available' });
+            alert('Special perk approved successfully!');
+            location.reload();
+        } catch (err) {
+            console.error("Error approving voucher:", err);
+            alert("Error: " + err.message);
         }
+    };
 
-        // Make render function accessible globally
-        window.renderAdminVouchers = renderAdminVouchers;
-
-        // 2. GLOBAL ACTION HANDLERS
-        window.approveVoucher = async function(docId) {
-            try {
-                const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                if (!window.db) throw new Error("Database reference not initialized.");
-                const vRef = doc(window.db, "vouchers", docId);
-                await updateDoc(vRef, { status: 'Approved & Available' });
-                alert('Voucher approved successfully!');
-            } catch (err) {
-                console.error("Error approving voucher:", err);
-                alert("Error: " + err.message);
-            }
-        };
-
-        window.markVoucherUsed = async function(docId) {
-            if (!confirm("Are you sure you want to mark this voucher as USED?")) return;
-            try {
-                const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                if (!window.db) throw new Error("Database reference not initialized.");
-                const vRef = doc(window.db, "vouchers", docId);
-                await updateDoc(vRef, { status: 'Used' });
-                alert('Voucher marked as used!');
-            } catch (err) {
-                console.error("Error marking voucher used:", err);
-                alert("Error: " + err.message);
-            }
-        };
-    </script>
+    window.markVoucherUsed = async function(docId) {
+        if (!confirm("Are you sure you want to mark this voucher as USED?")) return;
+        try {
+            const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            if (!window.db) throw new Error("Database reference not initialized.");
+            const vRef = doc(window.db, "vouchers", docId);
+            await updateDoc(vRef, { status: 'Used' });
+            alert('Voucher marked as used!');
+            location.reload();
+        } catch (err) {
+            console.error("Error marking voucher used:", err);
+            alert("Error: " + err.message);
+        }
+    };
+</script>
 </body>
 </html>
 </body>
