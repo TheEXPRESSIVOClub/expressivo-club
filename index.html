@@ -796,13 +796,14 @@
 
             // Update Vouchers Approvals Table
             const vouchersTable = document.getElementById('admin-vouchers-table');
-            if (vouchersTable) {
+            if (vouchersTable && window.appData?.vouchers) {
               vouchersTable.innerHTML = window.appData.vouchers.map(v => {
                 const titleText = v.title || v.voucherTitle || '';
+                const titleLower = titleText.toLowerCase();
                 let perkDisplay = '';
 
                 // Check for Birthday Perk
-                if (titleText.toLowerCase().includes('birthday') || v.isBirthdayPerk) {
+                if (titleLower.includes('birthday') || v.isBirthdayPerk) {
                   perkDisplay = `
                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800">
                       🎂 ${v.currentMonthPerk || v.giftDescription || 'Variable Monthly Gift'}
@@ -821,18 +822,24 @@
                   }
                 }
 
-                // Interactive button for actions
-                const isAvailable = v.status && (v.status.includes('Available') || v.status.includes('Pending'));
-                const actionBtn = isAvailable 
-                  ? `<button onclick="approveVoucher('${v.id}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded shadow-sm">Approve & Redeem</button>`
-                  : `<span class="text-slate-400 italic">No action</span>`;
+                // Conditional Action Button: ONLY Birthday/Merchandise require approval
+                const requiresApproval = titleLower.includes('birthday') || titleLower.includes('merchandise') || v.requiresApproval;
+                const isPending = v.status && (v.status.includes('Available') || v.status.includes('Pending'));
+
+                let actionBtn = `<span class="text-slate-400 text-xs italic">Auto-Active (Ready)</span>`;
+
+                if (requiresApproval && isPending) {
+                  actionBtn = `<button onclick="approveVoucher('${v.id}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded shadow-sm">Approve Perk</button>`;
+                } else if (requiresApproval) {
+                  actionBtn = `<span class="text-purple-600 text-xs font-semibold">Approved ✓</span>`;
+                }
 
                 return `
                   <tr class="border-b hover:bg-slate-50">
                     <td class="p-3 font-bold text-slate-900">${titleText}</td>
-                    <td class="p-3 text-slate-600">${v.family || v.familyId}</td>
+                    <td class="p-3 text-slate-600">${v.family || v.familyId || 'N/A'}</td>
                     <td class="p-3 text-slate-600">${perkDisplay}</td>
-                    <td class="p-3"><span class="px-2 py-0.5 rounded font-bold text-[10px] bg-amber-100 text-amber-800">${v.status}</span></td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded font-bold text-[10px] bg-amber-100 text-amber-800">${v.status || 'Active'}</span></td>
                     <td class="p-3 text-right">${actionBtn}</td>
                   </tr>
                 `;
