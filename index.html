@@ -824,14 +824,17 @@
 
                 // Conditional Action Button: ONLY Birthday/Merchandise require approval
                 const requiresApproval = titleLower.includes('birthday') || titleLower.includes('merchandise') || v.requiresApproval;
-                const isPending = v.status && (v.status.includes('Available') || v.status.includes('Pending'));
+                const statusLower = (v.status || '').toLowerCase();
+                const isPending = statusLower.includes('available to redeem') || statusLower.includes('pending');
 
                 let actionBtn = `<span class="text-slate-400 text-xs italic">Auto-Active (Ready)</span>`;
 
-                if (requiresApproval && isPending) {
-                  actionBtn = `<button onclick="approveVoucher('${v.id}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded shadow-sm">Approve Perk</button>`;
-                } else if (requiresApproval) {
-                  actionBtn = `<span class="text-purple-600 text-xs font-semibold">Approved ✓</span>`;
+                if (requiresApproval) {
+                    if (isPending) {
+                        actionBtn = `<button onclick="approveVoucher('${v.id}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded shadow-sm">Approve Perk</button>`;
+                    } else {
+                        actionBtn = `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">Approved ✓</span>`;
+                    }
                 }
 
                 return `
