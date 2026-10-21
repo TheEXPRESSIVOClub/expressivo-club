@@ -1133,23 +1133,30 @@
             tableBody.innerHTML = vouchers.map(v => {
                 // Dynamic Discount Value Calculation
                 let discountDisplay = '';
+                const titleText = v.title || v.voucherTitle || '';
 
-                const rawAmount = v.discountAmount !== undefined ? v.discountAmount : (v.amount !== undefined ? v.amount : v.value);
-
-                if ((v.title || v.voucherTitle) && ((v.title || v.voucherTitle).toLowerCase().includes('birthday') || v.isBirthdayPerk)) {
-                  // Dynamic badge for monthly birthday perks
+                // 1. Check for Birthday Perk
+                if (titleText.toLowerCase().includes('birthday') || v.isBirthdayPerk) {
                   discountDisplay = `
                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                       🎂 ${v.currentMonthPerk || v.giftDescription || 'Variable Monthly Gift'}
                     </span>
                   `;
-                } else if (rawAmount !== undefined && rawAmount !== null && !isNaN(rawAmount)) {
-                  discountDisplay = `<span class="text-sm font-semibold text-gray-900">RM ${parseFloat(rawAmount).toFixed(2)}</span>`;
-                } else if (v.title && v.title.toLowerCase().includes('free')) {
-                  discountDisplay = `<span class="text-sm font-semibold text-gray-900">100% OFF</span>`;
-                } else {
-                  discountDisplay = `<span class="text-sm text-gray-500">N/A</span>`;
-                }
+                } 
+                // 2. Read explicit discountAmount or title amount (e.g., RM5)
+                else {
+                  const rawAmount = v.discountAmount !== undefined ? v.discountAmount : (v.amount !== undefined ? v.amount : v.value);
+  
+                  if (rawAmount !== undefined && rawAmount !== null && !isNaN(rawAmount)) {
+                    discountDisplay = `<span class="text-sm font-semibold text-gray-900">RM ${parseFloat(rawAmount).toFixed(2)}</span>`;
+                  } else if (titleText.match(/RM\s*(\d+(?:\.\d+)?)/i)) {
+                    const match = titleText.match(/RM\s*(\d+(?:\.\d+)?)/i);
+                    discountDisplay = `<span class="text-sm font-semibold text-gray-900">RM ${parseFloat(match[1]).toFixed(2)}</span>`;
+                  } else if (titleText.toLowerCase().includes('free')) {
+                    discountDisplay = `<span class="text-sm font-semibold text-gray-900">100% OFF</span>`;
+                  } else {
+                    discountDisplay = `<span class="text-sm text-gray-500">N/A</span>`;
+                  }
                 }
 
                 // Dynamic Action Button Matching
