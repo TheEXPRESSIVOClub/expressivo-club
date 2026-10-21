@@ -340,14 +340,25 @@
         }
 
         window.approveVoucher = async function(docId) {
-            try {
-                const vRef = doc(db, "vouchers", docId);
-                await updateDoc(vRef, { status: 'Approved & Available' });
-                alert('Voucher approved successfully!');
-            } catch (err) {
-                console.error("Error approving voucher:", err);
-            }
-        }
+          if (!docId) {
+            alert('Error: Voucher ID is missing.');
+            return;
+          }
+          try {
+            const vRef = doc(db, "vouchers", docId);
+    
+            // 1. Update the status in Firestore
+            await updateDoc(vRef, { status: 'Approved & Available' });
+    
+            alert('Voucher approved successfully!');
+    
+            // 2. Force the page to reload so the UI instantly shows the new status
+            location.reload();
+          } catch (err) {
+            console.error("Error approving voucher:", err);
+            alert('Failed to approve voucher. Check console for details.');
+          }
+        };
 
         window.adjustWallet = async function(familyKey) {
             const amountStr = prompt('Enter amount to add (positive) or top-up for family wallet:', '50');
