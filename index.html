@@ -1136,7 +1136,7 @@
 
                 const rawAmount = v.discountAmount !== undefined ? v.discountAmount : (v.amount !== undefined ? v.amount : v.value);
 
-                if (v.title && (v.title.toLowerCase().includes('birthday') || v.isBirthdayPerk)) {
+                if ((v.title || v.voucherTitle) && ((v.title || v.voucherTitle).toLowerCase().includes('birthday') || v.isBirthdayPerk)) {
                   // Dynamic badge for monthly birthday perks
                   discountDisplay = `
                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
