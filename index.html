@@ -294,15 +294,35 @@
             const starsToSubtract = Math.round(fee / 2); // RM2 = 1 Star earned ratio
 
             try {
-                // Remove student from workshop registered list
+                // 1. Remove student from workshop registered list
                 const updatedRegistered = (workshop.registered || []).filter(s => {
                     if (typeof s === 'string') return s !== studentName;
                     return s.name !== studentName;
                 });
 
-                await updateDoc(doc(db, "workshops", wsId), { registered: updatedRegistered });
+                // 2. Generate precise timestamp & staff details
+                const now = new Date();
+                const formattedDate = now.toISOString().split('T')[0];
+                const formattedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const staffName = window.currentStaffName || "Admin Staff";
 
-                // Refund family wallet & subtract stars
+                // 3. Create cancellation record to show reason on UI card
+                const cancellationRecord = {
+                    studentName: studentName,
+                    familyId: familyId,
+                    reason: remark,
+                    cancelledAt: `${formattedDate} ${formattedTime}`,
+                    cancelledBy: staffName
+                };
+                const updatedCancelled = [...(workshop.cancelled || []), cancellationRecord];
+
+                // 4. Update workshop in Firestore with updated registered & cancelled lists
+                await updateDoc(doc(db, "workshops", wsId), { 
+                    registered: updatedRegistered,
+                    cancelled: updatedCancelled 
+                });
+
+                // 5. Refund family wallet & subtract stars
                 const fam = window.appData.families[familyId] || { wallet: 0, stars: 100 };
                 const newWallet = Number(fam.wallet || 0) + fee;
                 const newStars = Math.max(0, Number(fam.stars || 100) - starsToSubtract);
@@ -312,22 +332,24 @@
                     stars: newStars
                 }, { merge: true });
 
-                // Log audit transaction
+                // 6. Log audit transaction with time, staff, and remark
                 await addDoc(collection(db, "transactions"), {
-                    date: new Date().toISOString().split('T')[0],
-                    student: studentName,
+                    date: `${formattedDate} ${formattedTime}`,
+                    entity: `${studentName} (Processed by ${staffName})`,
                     family: familyId,
-                    desc: `Workshop Cancellation & Refund: ${workshop.title} (Remark: ${remark})`,
+                    desc: `Workshop Cancellation & Refund: ${workshop.title} (Reason: ${remark})`,
                     amount: `+ RM ${fee.toFixed(2)}`,
-                    starsChange: `-${starsToSubtract} ⭐`
+                    starsChange: `-${starsToSubtract} ⭐`,
+                    timestamp: now
                 });
 
                 alert(`Successfully cancelled registration for ${studentName}. Refunded RM ${fee.toFixed(2)} and subtracted ${starsToSubtract} ⭐.`);
+                location.reload(); // Refreshes page to display the reason on the UI
             } catch (err) {
                 console.error("Error cancelling student workshop registration:", err);
                 alert("Error processing cancellation.");
             }
-        }
+        };
 
         window.deleteWorkshop = async function(wsId, wsTitle) {
             if (!confirm(`Are you sure you want to delete workshop "${wsTitle}"?`)) return;
