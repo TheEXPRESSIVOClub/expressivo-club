@@ -340,24 +340,49 @@
         }
 
         window.approveVoucher = async function(docId) {
-          if (!docId) {
-            alert('Error: Voucher ID is missing.');
-            return;
-          }
-          try {
-            const vRef = doc(db, "vouchers", docId);
-    
-            // 1. Update the status in Firestore
-            await updateDoc(vRef, { status: 'Approved & Available' });
-    
-            alert('Voucher approved successfully!');
-    
-            // 2. Force the page to reload so the UI instantly shows the new status
-            location.reload();
-          } catch (err) {
-            console.error("Error approving voucher:", err);
-            alert('Failed to approve voucher. Check console for details.');
-          }
+            if (!docId) {
+                alert('Error: Voucher ID is missing.');
+                return;
+            }
+            try {
+                const { doc, updateDoc, collection, addDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                if (!window.db) throw new Error("Database reference not initialized.");
+
+                // 1. Find voucher in local data to capture details for audit log
+                const vouchers = window.appData?.vouchers || [];
+                const targetVoucher = vouchers.find(v => v.id === docId) || {};
+                const familyId = targetVoucher.family || targetVoucher.familyId || 'N/A';
+                const voucherTitle = targetVoucher.title || targetVoucher.voucherTitle || 'Special Perk';
+
+                // 2. Update the status in Firestore
+                const vRef = doc(window.db, "vouchers", docId);
+                await updateDoc(vRef, { status: 'Approved & Available' });
+
+                // 3. Generate precise timestamp & staff details
+                const now = new Date();
+                const formattedDate = now.toISOString().split('T')[0]; // e.g., 2026-10-22
+                const formattedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); // e.g., 02:22 PM
+                const staffName = window.currentStaffName || "Admin Staff";
+
+                // 4. Log the approval directly into your transactions/audit trail
+                await addDoc(collection(window.db, "transactions"), {
+                    date: `${formattedDate} ${formattedTime}`,
+                    entity: staffName,
+                    family: familyId,
+                    description: `Approved Special Perk: ${voucherTitle}`,
+                    amount: "RM 0.00",
+                    starsLogged: "0 (Admin Approval)",
+                    timestamp: now
+                });
+
+                alert('Voucher approved and logged successfully!');
+
+                // 5. Force the page to reload so the UI instantly shows the new status
+                location.reload();
+            } catch (err) {
+                console.error("Error approving voucher:", err);
+                alert('Failed to approve voucher. Check console for details.');
+            }
         };
 
         window.adjustWallet = async function(familyKey) {
