@@ -432,6 +432,9 @@
             }
         }
 
+        // Initialize default POS Mode
+        window.appData.posMode = window.appData.posMode || 'workshop';
+
         window.filterPosStudents = function() {
             const searchVal = document.getElementById('pos-student-search').value.toLowerCase();
             const resultsContainer = document.getElementById('pos-student-search-results');
@@ -464,7 +467,7 @@
                 }).join('');
             }
             resultsContainer.classList.remove('hidden');
-        }
+        };
 
         window.selectPosStudent = function(studentId, studentName) {
             window.appData.activePosStudentId = studentId;
@@ -474,12 +477,45 @@
 
             const searchInput = document.getElementById('pos-student-search');
             if (searchInput) searchInput.value = studentName;
-            
+    
             const resultsContainer = document.getElementById('pos-student-search-results');
             if (resultsContainer) resultsContainer.classList.add('hidden');
 
             updateAdminUI();
-        }
+        };
+
+        // Switch between 'workshop' and 'merchandise'
+        window.setPosMode = function(mode) {
+            window.appData.posMode = mode;
+            populatePosDropdown();
+            calculatePosCheckout();
+        };
+
+        // Dynamically populate the select element based on active mode
+        window.populatePosDropdown = function() {
+            const wsSelect = document.getElementById('pos-ws-select');
+            if (!wsSelect) return;
+
+            const mode = window.appData.posMode || 'workshop';
+    
+            if (mode === 'workshop') {
+                const workshops = window.appData.workshops || [];
+                wsSelect.innerHTML = workshops.length > 0 
+                    ? workshops.map(w => `<option value="${w.id}" data-price="${w.price}">${w.title} - RM ${Number(w.price).toFixed(2)}</option>`).join('')
+                    : `<option value="">No active workshops available</option>`;
+            } else {
+                // Sample merchandise list (or pull from window.appData.merchandise if stored in database)
+                const merchandiseList = window.appData.merchandise || [
+                    { id: 'm1', title: 'Club T-Shirt (Size: M)', price: 50.00 },
+                    { id: 'm2', title: 'Club T-Shirt (Size: L)', price: 50.00 },
+                    { id: 'm3', title: 'Music Workbook Vol. 1', price: 35.00 },
+                    { id: 'm4', title: 'Expressivo Tote Bag', price: 25.00 }
+                ];
+                wsSelect.innerHTML = merchandiseList.map(m => `<option value="${m.id}" data-price="${m.price}">${m.title} - RM ${Number(m.price).toFixed(2)}</option>`).join('');
+            }
+
+            window.onWorkshopDropdownChange();
+        };
 
         window.onWorkshopDropdownChange = function() {
             const wsSelect = document.getElementById('pos-ws-select');
@@ -487,17 +523,19 @@
             if (!wsSelect || !priceInput) return;
 
             const selectedOption = wsSelect.options[wsSelect.selectedIndex];
-            const basePrice = parseFloat(selectedOption.getAttribute('data-price') || '120');
+            if (!selectedOption) return;
+
+            const basePrice = parseFloat(selectedOption.getAttribute('data-price') || '0');
             priceInput.value = basePrice.toFixed(2);
             calculatePosCheckout();
-        }
+        };
 
         window.selectPosVoucher = function(voucherId, title, discountValue) {
             window.appData.selectedVoucherId = voucherId;
             window.appData.selectedVoucherDiscount = parseFloat(discountValue) || 0;
             window.appData.selectedVoucherTitle = title;
             updateAdminUI();
-        }
+        };
 
         window.calculatePosCheckout = function() {
             const priceInput = document.getElementById('pos-original-price');
@@ -509,20 +547,24 @@
             const family = familyKey ? (window.appData.families[familyKey] || { tier: 'Prelude', stars: 100, wallet: 0 }) : { tier: 'Prelude', stars: 100, wallet: 0 };
 
             let tierDiscountRate = 0;
-            if (family.tier === 'Ensemble') tierDiscountRate = 0;
             if (family.tier === 'Crescendo') tierDiscountRate = 0.05;
             else if (family.tier === 'Virtuoso') tierDiscountRate = 0.10;
 
             const tierDiscountAmount = basePrice * tierDiscountRate;
-            const voucherDiscount = window.appData.selectedVoucherDiscount;
+            const voucherDiscount = window.appData.selectedVoucherDiscount || 0;
             const netAmount = Math.max(0, basePrice - tierDiscountAmount - voucherDiscount);
-            
+    
             const starsCredited = Math.round(netAmount / 2);
 
-            document.getElementById('breakdown-original').innerText = `RM ${basePrice.toFixed(2)}`;
-            document.getElementById('breakdown-discount').innerText = `- RM ${(tierDiscountAmount + voucherDiscount).toFixed(2)} (Inc. ${(tierDiscountRate * 100)}% ${family.tier} Tier + Voucher)`;
-            document.getElementById('breakdown-net').innerText = `RM ${netAmount.toFixed(2)}`;
-            document.getElementById('breakdown-stars').innerText = `+${starsCredited} ⭐`;
+            const breakdownOrig = document.getElementById('breakdown-original');
+            const breakdownDisc = document.getElementById('breakdown-discount');
+            const breakdownNet = document.getElementById('breakdown-net');
+            const breakdownStars = document.getElementById('breakdown-stars');
+
+            if (breakdownOrig) breakdownOrig.innerText = `RM ${basePrice.toFixed(2)}`;
+            if (breakdownDisc) breakdownDisc.innerText = `- RM ${(tierDiscountAmount + voucherDiscount).toFixed(2)} (Inc. ${(tierDiscountRate * 100)}% ${family.tier} Tier + Voucher)`;
+            if (breakdownNet) breakdownNet.innerText = `RM ${netAmount.toFixed(2)}`;
+            if (breakdownStars) breakdownStars.innerText = `+${starsCredited} ⭐`;
 
             const lowWalletWarning = document.getElementById('low-wallet-warning');
             if (lowWalletWarning) {
@@ -533,7 +575,7 @@
                     lowWalletWarning.classList.add('hidden');
                 }
             }
-        }
+        };
 
         window.completePosCheckout = async function() {
             const student = window.appData.students.find(s => s.id === window.appData.activePosStudentId);
@@ -543,20 +585,21 @@
             }
 
             const wsSelect = document.getElementById('pos-ws-select');
-            if (!wsSelect || wsSelect.options.length === 0) {
-                alert("Please create and select a workshop event first!");
+            if (!wsSelect || wsSelect.options.length === 0 || !wsSelect.value) {
+                alert("Please select an item or workshop first!");
                 return;
             }
 
-            const wsId = wsSelect.value;
-            const wsTitle = wsSelect.options[wsSelect.selectedIndex].text.split(' - ')[0];
-            const basePrice = parseFloat(document.getElementById('pos-original-price').value) || 120;
+            const mode = window.appData.posMode || 'workshop';
+            const itemId = wsSelect.value;
+            const itemTitle = wsSelect.options[wsSelect.selectedIndex].text.split(' - ')[0];
+            const basePrice = parseFloat(document.getElementById('pos-original-price').value) || 0;
             const familyKey = student.family;
             const family = window.appData.families[familyKey] || { tier: 'Prelude', stars: 100, wallet: 0 };
 
             let tierDiscountRate = family.tier === 'Crescendo' ? 0.05 : family.tier === 'Virtuoso' ? 0.10 : 0;
             const tierDiscountAmount = basePrice * tierDiscountRate;
-            const voucherDiscount = window.appData.selectedVoucherDiscount;
+            const voucherDiscount = window.appData.selectedVoucherDiscount || 0;
             const netAmount = Math.max(0, basePrice - tierDiscountAmount - voucherDiscount);
             const starsEarned = Math.round(netAmount / 2);
 
@@ -568,45 +611,58 @@
 
             const newWallet = currentWallet - netAmount;
             const newStars = Number(family.stars || 100) + starsEarned;
+            const staffName = window.currentStaffName || "Admin Staff";
+            const now = new Date();
 
             try {
+                // 1. Deduct Family Wallet & Credit Stars
                 const famRef = doc(db, "families", familyKey);
                 await setDoc(famRef, { wallet: newWallet, stars: newStars }, { merge: true });
 
-                // Add student to workshop registered list
-                const wsObj = window.appData.workshops.find(w => w.id === wsId);
-                if (wsObj) {
-                    const currentRegistered = wsObj.registered || [];
-                    const alreadyRegistered = currentRegistered.some(r => (typeof r === 'string' ? r === student.name : r.name === student.name));
-                    if (!alreadyRegistered) {
-                        currentRegistered.push({ name: student.name, family: familyKey, feePaid: netAmount });
-                        await updateDoc(doc(db, "workshops", wsId), { registered: currentRegistered });
+                // 2. If Workshop Mode, register student in workshop collection
+                if (mode === 'workshop') {
+                    const wsObj = window.appData.workshops.find(w => w.id === itemId);
+                    if (wsObj) {
+                        const currentRegistered = wsObj.registered || [];
+                        const alreadyRegistered = currentRegistered.some(r => (typeof r === 'string' ? r === student.name : r.name === student.name));
+                        if (!alreadyRegistered) {
+                            currentRegistered.push({ name: student.name, family: familyKey, feePaid: netAmount });
+                            await updateDoc(doc(db, "workshops", itemId), { registered: currentRegistered });
+                        }
                     }
                 }
 
+                // 3. Mark Voucher as Redeemed if applied
                 if (window.appData.selectedVoucherId) {
                     await updateDoc(doc(db, "vouchers", window.appData.selectedVoucherId), { status: 'Redeemed' });
                 }
 
+                // 4. Record Audit Transaction
+                const descPrefix = mode === 'workshop' ? 'Workshop Purchase' : 'Merchandise Sale';
                 await addDoc(collection(db, "transactions"), {
-                    date: new Date().toISOString().split('T')[0],
+                    date: `${now.toISOString().split('T')[0]} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
                     student: student.name,
+                    entity: `${student.name} (Processed by ${staffName})`,
                     family: familyKey,
-                    desc: `POS Checkout: ${wsTitle} (Voucher: ${window.appData.selectedVoucherTitle})`,
+                    desc: `POS ${descPrefix}: ${itemTitle} (Voucher: ${window.appData.selectedVoucherTitle})`,
                     amount: `- RM ${netAmount.toFixed(2)}`,
-                    starsChange: `+${starsEarned} ⭐`
+                    starsChange: `+${starsEarned} ⭐`,
+                    timestamp: now
                 });
 
+                // 5. Render WhatsApp Receipt Modal
                 showReceiptModal({
                     studentName: student.name,
                     familyKey: familyKey,
-                    workshop: wsTitle,
+                    itemTitle: itemTitle,
+                    itemType: mode === 'workshop' ? 'Workshop Event' : 'Merchandise Item',
                     netAmount: netAmount,
                     remainingWallet: newWallet,
                     starsEarned: starsEarned,
                     totalStars: newStars
                 });
-                
+        
+                // Reset state
                 window.appData.selectedVoucherId = null;
                 window.appData.selectedVoucherDiscount = 0;
                 window.appData.selectedVoucherTitle = "None";
@@ -616,14 +672,14 @@
                 console.error("Error completing POS checkout:", err);
                 alert("Error recording POS transaction.");
             }
-        }
+        };
 
         window.showReceiptModal = function(receiptData) {
             const modal = document.getElementById('receipt-modal');
             const content = document.getElementById('receipt-modal-content');
             if (!modal || !content) return;
 
-            const textToCopy = `🎵 *EXPRESSIVOCLUB RECEIPT* 🎵\n📅 Date: ${new Date().toLocaleDateString()}\n👤 Student: ${receiptData.studentName} (Family: ${receiptData.familyKey})\n📚 Event: ${receiptData.workshop}\n💳 Deducted: RM ${receiptData.netAmount.toFixed(2)}\n💰 Remaining Wallet: RM ${receiptData.remainingWallet.toFixed(2)}\n⭐ Stars Earned: +${receiptData.starsEarned} (Total: ${receiptData.totalStars})\n\nThank you for learning with Expressivo Club! ✨`;
+            const textToCopy = `🎵 *EXPRESSIVOCLUB RECEIPT* 🎵\n📅 Date: ${new Date().toLocaleDateString()}\n👤 Student: ${receiptData.studentName} (Family: ${receiptData.familyKey})\n🛍️ ${receiptData.itemType}: ${receiptData.itemTitle}\n💳 Deducted: RM ${receiptData.netAmount.toFixed(2)}\n💰 Remaining Wallet: RM ${receiptData.remainingWallet.toFixed(2)}\n⭐ Stars Earned: +${receiptData.starsEarned} (Total: ${receiptData.totalStars})\n\nThank you for learning with Expressivo Club! ✨`;
 
             content.innerHTML = `
                 <div class="space-y-3 text-xs text-slate-700">
@@ -631,7 +687,7 @@
                         <p class="font-bold text-slate-900 text-center text-sm border-b pb-2">RECEIPT - EXPRESSIVO CLUB</p>
                         <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
                         <p><strong>Student:</strong> ${receiptData.studentName} (${receiptData.familyKey})</p>
-                        <p><strong>Workshop:</strong> ${receiptData.workshop}</p>
+                        <p><strong>Item:</strong> ${receiptData.itemTitle}</p>
                         <p><strong>Deducted:</strong> RM ${receiptData.netAmount.toFixed(2)}</p>
                         <p><strong>Wallet Left:</strong> RM ${receiptData.remainingWallet.toFixed(2)}</p>
                         <p><strong>Stars Earned:</strong> +${receiptData.starsEarned} ⭐ (Total: ${receiptData.totalStars})</p>
@@ -644,7 +700,7 @@
                 </div>
             `;
             modal.classList.remove('hidden');
-        }
+        };
 
         window.switchAdminTab = function(tabName) {
             const tabs = ['pos', 'students', 'workshops', 'vouchers', 'transactions'];
