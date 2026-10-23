@@ -484,38 +484,60 @@
             updateAdminUI();
         };
 
-        // Switch between 'workshop' and 'merchandise'
-        window.setPosMode = function(mode) {
-            window.appData.posMode = mode;
-            populatePosDropdown();
-            calculatePosCheckout();
-        };
+       // Switch between 'workshop' and 'merchandise'
+       window.setPosMode = function(mode) {
+           window.appData.posMode = mode;
 
-        // Dynamically populate the select element based on active mode
-        window.populatePosDropdown = function() {
-            const wsSelect = document.getElementById('pos-ws-select');
-            if (!wsSelect) return;
+           // 1. Update active button styling UI classes
+           const btnWorkshop = document.getElementById('btn-mode-workshop');
+           const btnMerch = document.getElementById('btn-mode-merch');
 
-            const mode = window.appData.posMode || 'workshop';
-    
-            if (mode === 'workshop') {
-                const workshops = window.appData.workshops || [];
-                wsSelect.innerHTML = workshops.length > 0 
-                    ? workshops.map(w => `<option value="${w.id}" data-price="${w.price}">${w.title} - RM ${Number(w.price).toFixed(2)}</option>`).join('')
-                    : `<option value="">No active workshops available</option>`;
-            } else {
-                // Sample merchandise list (or pull from window.appData.merchandise if stored in database)
-                const merchandiseList = window.appData.merchandise || [
-                    { id: 'm1', title: 'Club T-Shirt (Size: M)', price: 50.00 },
-                    { id: 'm2', title: 'Club T-Shirt (Size: L)', price: 50.00 },
-                    { id: 'm3', title: 'Music Workbook Vol. 1', price: 35.00 },
-                    { id: 'm4', title: 'Expressivo Tote Bag', price: 25.00 }
-                ];
-                wsSelect.innerHTML = merchandiseList.map(m => `<option value="${m.id}" data-price="${m.price}">${m.title} - RM ${Number(m.price).toFixed(2)}</option>`).join('');
-            }
+           if (btnWorkshop && btnMerch) {
+               if (mode === 'workshop') {
+                   btnWorkshop.className = "px-3 py-1 text-xs font-bold rounded-lg bg-indigo-600 text-white shadow transition";
+                   btnMerch.className = "px-3 py-1 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-200 transition";
+               } else {
+                   btnMerch.className = "px-3 py-1 text-xs font-bold rounded-lg bg-indigo-600 text-white shadow transition";
+                   btnWorkshop.className = "px-3 py-1 text-xs font-bold rounded-lg text-slate-600 hover:bg-slate-200 transition";
+               }
+           }
 
-            window.onWorkshopDropdownChange();
-        };
+           // 2. Update the dropdown label text dynamically
+           const labelEl = document.getElementById('pos-item-select-label');
+           if (labelEl) {
+               labelEl.innerText = mode === 'workshop' 
+                   ? "Select Workshop Event (Synced with Database)" 
+                   : "Select Merchandise Item (Synced with Inventory)";
+           }
+
+           populatePosDropdown();
+           calculatePosCheckout();
+       };
+
+       // Dynamically populate the select element based on active mode
+       window.populatePosDropdown = function() {
+           const wsSelect = document.getElementById('pos-ws-select');
+           if (!wsSelect) return;
+
+           const mode = window.appData.posMode || 'workshop';
+
+           if (mode === 'workshop') {
+               const workshops = window.appData.workshops || [];
+               wsSelect.innerHTML = workshops.length > 0 
+                   ? workshops.map(w => `<option value="${w.id}" data-price="${w.price}">${w.title} - RM ${Number(w.price).toFixed(2)}</option>`).join('')
+                   : `<option value="">No active workshops available</option>`;
+           } else {
+               const merchandiseList = window.appData.merchandise || [
+                   { id: 'm1', title: 'Club T-Shirt (Size: S)', price: 50.00 },
+                   { id: 'm2', title: 'Club T-Shirt (Size: M)', price: 50.00 },
+                   { id: 'm3', title: 'Club T-Shirt (Size: L)', price: 35.00 },
+                   { id: 'm4', title: 'Expressivo Tote Bag', price: 25.00 }
+               ];
+               wsSelect.innerHTML = merchandiseList.map(m => `<option value="${m.id}" data-price="${m.price}">${m.title} - RM ${Number(m.price).toFixed(2)}</option>`).join('');
+           }
+
+           window.onWorkshopDropdownChange();
+       };
 
         window.onWorkshopDropdownChange = function() {
             const wsSelect = document.getElementById('pos-ws-select');
