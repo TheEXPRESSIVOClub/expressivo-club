@@ -514,42 +514,55 @@
            calculatePosCheckout();
        };
 
-       // Dynamically populate the select element based on active mode
-       window.populatePosDropdown = function() {
-           const wsSelect = document.getElementById('pos-ws-select');
-           if (!wsSelect) return;
+        // Render Item Cards Grid (Supports both Workshops and Merchandise)
+        window.renderPosItemGrid = function() {
+            const gridContainer = document.getElementById('pos-item-grid');
+            if (!gridContainer) return;
 
-           const mode = window.appData.posMode || 'workshop';
+            const mode = window.appData.posMode || 'workshop';
 
-           if (mode === 'workshop') {
-               const workshops = window.appData.workshops || [];
-               wsSelect.innerHTML = workshops.length > 0 
-                   ? workshops.map(w => `<option value="${w.id}" data-price="${w.price}">${w.title} - RM ${Number(w.price).toFixed(2)}</option>`).join('')
-                   : `<option value="">No active workshops available</option>`;
-           } else {
-               const merchandiseList = window.appData.merchandise || [
-                   { id: 'm1', title: 'Club T-Shirt (Size: S)', price: 50.00 },
-                   { id: 'm2', title: 'Club T-Shirt (Size: M)', price: 50.00 },
-                   { id: 'm3', title: 'Club T-Shirt (Size: L)', price: 35.00 },
-                   { id: 'm4', title: 'Expressivo Tote Bag', price: 25.00 }
-               ];
-               wsSelect.innerHTML = merchandiseList.map(m => `<option value="${m.id}" data-price="${m.price}">${m.title} - RM ${Number(m.price).toFixed(2)}</option>`).join('');
-           }
+            if (mode === 'workshop') {
+                const workshops = window.appData.workshops || [];
+        
+                if (workshops.length === 0) {
+                    gridContainer.innerHTML = `<p class="col-span-4 text-slate-400 italic text-xs text-center py-6">No active workshops available.</p>`;
+                    return;
+                }
 
-           window.onWorkshopDropdownChange();
-       };
+                gridContainer.innerHTML = workshops.map(w => `
+                    <div class="bg-slate-50 border rounded-xl p-3 flex flex-col justify-between hover:border-indigo-500 transition shadow-sm">
+                        <div class="text-center py-2">
+                            <div class="text-2xl mb-1">🎓</div>
+                            <div class="font-bold text-slate-800 text-xs line-clamp-2">${w.title}</div>
+                            <div class="text-indigo-600 font-extrabold text-xs mt-1">RM ${Number(w.price).toFixed(2)}</div>
+                        </div>
+                        <button type="button" onclick="addCustomItemToCart('${w.id}', '${w.title.replace(/'/g, "\\'")}', ${Number(w.price)}, 'workshop')" class="mt-2 w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition">
+                            + Add to Cart
+                        </button>
+                    </div>
+                `).join('');
 
-        window.onWorkshopDropdownChange = function() {
-            const wsSelect = document.getElementById('pos-ws-select');
-            const priceInput = document.getElementById('pos-original-price');
-            if (!wsSelect || !priceInput) return;
+            } else {
+                const merchList = window.appData.merchandise || [
+                    { id: 'm1', title: 'Club T-Shirt (Size: S)', price: 50.00 },
+                    { id: 'm2', title: 'Club T-Shirt (Size: M)', price: 50.00 },
+                    { id: 'm3', title: 'Music Workbook Vol 1', price: 35.00 },
+                    { id: 'm4', title: 'Expressivo Tote Bag', price: 25.00 }
+                ];
 
-            const selectedOption = wsSelect.options[wsSelect.selectedIndex];
-            if (!selectedOption) return;
-
-            const basePrice = parseFloat(selectedOption.getAttribute('data-price') || '0');
-            priceInput.value = basePrice.toFixed(2);
-            calculatePosCheckout();
+                gridContainer.innerHTML = merchList.map(m => `
+                    <div class="bg-slate-50 border rounded-xl p-3 flex flex-col justify-between hover:border-indigo-500 transition shadow-sm">
+                        <div class="text-center py-2">
+                            <div class="text-2xl mb-1">🛍️</div>
+                            <div class="font-bold text-slate-800 text-xs line-clamp-2">${m.title}</div>
+                            <div class="text-indigo-600 font-extrabold text-xs mt-1">RM ${Number(m.price).toFixed(2)}</div>
+                        </div>
+                        <button type="button" onclick="addCustomItemToCart('${m.id}', '${m.title.replace(/'/g, "\\'")}', ${Number(m.price)}, 'merchandise')" class="mt-2 w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition">
+                            + Add to Cart
+                        </button>
+                    </div>
+                `).join('');
+            }
         };
 
         window.selectPosVoucher = function(voucherId, title, discountValue) {
