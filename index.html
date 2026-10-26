@@ -573,9 +573,10 @@
         };
 
         window.calculatePosCheckout = function() {
-            const priceInput = document.getElementById('pos-original-price');
-            if (!priceInput) return;
-            const basePrice = parseFloat(priceInput.value) || 0;
+            const cart = window.appData.posCart || [];
+    
+            // Calculate total base price of all items in cart
+            const basePrice = cart.reduce((sum, item) => sum + Number(item.price || 0), 0);
 
             const student = window.appData.students.find(s => s.id === window.appData.activePosStudentId);
             const familyKey = student ? student.family : null;
@@ -588,18 +589,29 @@
             const tierDiscountAmount = basePrice * tierDiscountRate;
             const voucherDiscount = window.appData.selectedVoucherDiscount || 0;
             const netAmount = Math.max(0, basePrice - tierDiscountAmount - voucherDiscount);
-    
+
             const starsCredited = Math.round(netAmount / 2);
 
+            // Update UI elements in the Summary Breakdown
             const breakdownOrig = document.getElementById('breakdown-original');
             const breakdownDisc = document.getElementById('breakdown-discount');
+            const breakdownVoucher = document.getElementById('breakdown-voucher');
             const breakdownNet = document.getElementById('breakdown-net');
             const breakdownStars = document.getElementById('breakdown-stars');
+            const checkoutBtnText = document.getElementById('pos-checkout-btn-text');
 
             if (breakdownOrig) breakdownOrig.innerText = `RM ${basePrice.toFixed(2)}`;
-            if (breakdownDisc) breakdownDisc.innerText = `- RM ${(tierDiscountAmount + voucherDiscount).toFixed(2)} (Inc. ${(tierDiscountRate * 100)}% ${family.tier} Tier + Voucher)`;
+            if (breakdownDisc) {
+                breakdownDisc.innerText = `-RM ${tierDiscountAmount.toFixed(2)}`;
+                const discLabel = document.getElementById('breakdown-discount-label');
+                if (discLabel) discLabel.innerText = `Tier Discount (${(tierDiscountRate * 100)}% ${family.tier}):`;
+            }
+            if (breakdownVoucher) breakdownVoucher.innerText = `-RM ${voucherDiscount.toFixed(2)}`;
+    
+            // Final Net Payable update
             if (breakdownNet) breakdownNet.innerText = `RM ${netAmount.toFixed(2)}`;
             if (breakdownStars) breakdownStars.innerText = `+${starsCredited} ⭐`;
+            if (checkoutBtnText) checkoutBtnText.innerText = `Process & Deduct RM ${netAmount.toFixed(2)} from Wallet`;
 
             const lowWalletWarning = document.getElementById('low-wallet-warning');
             if (lowWalletWarning) {
