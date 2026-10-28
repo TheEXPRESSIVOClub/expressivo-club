@@ -631,13 +631,16 @@
                 return;
             }
 
-            const cart = window.appData.posCart || [];
-            if (cart.length === 0) {
-                alert("Please add at least one item to the cart first!");
+            const wsSelect = document.getElementById('pos-ws-select');
+            if (!wsSelect || wsSelect.options.length === 0 || !wsSelect.value) {
+                alert("Please select an item or workshop first!");
                 return;
             }
 
-            const basePrice = cart.reduce((sum, item) => sum + Number(item.price || 0), 0);
+            const mode = window.appData.posMode || 'workshop';
+            const itemId = wsSelect.value;
+            const itemTitle = wsSelect.options[wsSelect.selectedIndex].text.split(' - ')[0];
+            const basePrice = parseFloat(document.getElementById('pos-original-price').value) || 0;
             const familyKey = student.family;
             const family = window.appData.families[familyKey] || { tier: 'Prelude', stars: 100, wallet: 0 };
 
@@ -657,9 +660,6 @@
             const newStars = Number(family.stars || 100) + starsEarned;
             const staffName = window.currentStaffName || "Admin Staff";
             const now = new Date();
-
-            // Proceed with your Firebase transaction update & cart clearing here...
-        };
 
             try {
                 // 1. Deduct Family Wallet & Credit Stars
