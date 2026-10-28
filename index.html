@@ -124,42 +124,77 @@
         window.handleAddNewStudent = async function(e) {
             e.preventDefault();
             const name = document.getElementById('new-student-name').value.trim();
-            const familyId = document.getElementById('new-family-id').value.trim();
+            const familyId = document.getElementById('new-family-id').value.trim().toUpperCase();
             const contact = document.getElementById('new-student-contact').value.trim();
 
             // Explicitly grab the date value, with a clear fallback if empty
             const dobInput = document.getElementById('new-student-dob');
             const dob = (dobInput && dobInput.value) ? dobInput.value : '2016-01-01';
-            
+    
             const tier = document.getElementById('new-family-tier').value;
             const wallet = parseFloat(document.getElementById('new-family-wallet').value) || 0;
 
             try {
-                const famRef = doc(db, "families", familyId);
-                await setDoc(famRef, {
-                    wallet: wallet,
-                    stars: 100,
-                    tier: tier
-                }, { merge: true });
+                window.appData = window.appData || {};
+                window.appData.students = window.appData.students || [];
+                window.appData.families = window.appData.families || {};
 
-                await addDoc(collection(db, "students"), { name, family: familyId, contact, dob });
+                // 1. Check if Family already exists
+                const existingFamily = window.appData.families[familyId];
 
-                await addDoc(collection(db, "transactions"), {
-                    date: new Date().toISOString().split('T')[0],
-                    student: name,
-                    family: familyId,
-                    desc: 'Admin registered student & added initial wallet credit',
-                    amount: `+ RM ${wallet.toFixed(2)}`,
-                    starsChange: '+100 ⭐ (Welcome Bonus)'
-                });
+                if (existingFamily) {
+                    // Count how many students currently share this Family ID
+                    const linkedStudents = Object.values(window.appData.students).filter(s => s.family === familyId);
+                    const currentTier = existingFamily.tier || tier;
+                    const maxLimit = currentTier === 'Virtuoso' ? 4 : currentTier === 'Crescendo' ? 2 : 1;
 
-                alert(`Student "${name}" registered successfully!`);
+                    if (linkedStudents.length >= maxLimit) {
+                        alert(`Sharing Limit Reached!\n\nThe ${currentTier} tier allows up to ${maxLimit} shared members. This family already has ${linkedStudents.length} student(s) registered.`);
+                        return;
+                    }
+
+                    // Link student to existing family (preserve existing wallet & stars)
+                    await addDoc(collection(db, "students"), { name, family: familyId, contact, dob });
+
+                    await addDoc(collection(db, "transactions"), {
+                        date: new Date().toISOString().split('T')[0],
+                        student: name,
+                        family: familyId,
+                        desc: `Linked additional student (${name}) to existing shared family account`,
+                        amount: `RM 0.00`,
+                        starsChange: '0 ⭐'
+                    });
+
+                    alert(`Student "${name}" linked successfully to existing Family Account (${familyId})!`);
+                } else {
+                    // 2. Create brand new Family Account
+                    const famRef = doc(db, "families", familyId);
+                    await setDoc(famRef, {
+                        wallet: wallet,
+                        stars: 100,
+                        tier: tier
+                    }, { merge: true });
+
+                    await addDoc(collection(db, "students"), { name, family: familyId, contact, dob });
+
+                    await addDoc(collection(db, "transactions"), {
+                        date: new Date().toISOString().split('T')[0],
+                        student: name,
+                        family: familyId,
+                        desc: 'Admin registered student & added initial wallet credit',
+                        amount: `+ RM ${wallet.toFixed(2)}`,
+                        starsChange: '+100 ⭐ (Welcome Bonus)'
+                    });
+
+                    alert(`Student "${name}" and new Family Account registered successfully!`);
+                }
+
                 e.target.reset();
             } catch (err) {
                 console.error("Error adding student: ", err);
-                alert("Error saving to database.");
+                alert("Error saving to database. Check console for details.");
             }
-        }
+        };
 
         window.deleteStudent = async function(studentId, studentName, familyId) {
             if (!confirm(`Are you sure you want to remove student "${studentName}"?`)) return;
