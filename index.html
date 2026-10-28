@@ -62,6 +62,7 @@
                     window.appData.workshops.push({ id: docSnap.id, ...docSnap.data() });
                 });
                 updateAdminUI();
+                renderPosItemGrid();
             });
 
             onSnapshot(collection(db, "vouchers"), (snapshot) => {
