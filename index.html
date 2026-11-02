@@ -517,6 +517,13 @@
             const resultsContainer = document.getElementById('pos-student-search-results');
             if (resultsContainer) resultsContainer.classList.add('hidden');
 
+            const allStudents = window.appData.students || [];
+            const selectedStudent = allStudents.find(s => s.id === studentId);
+
+            if (selectedStudent && typeof window.renderPosVouchers === 'function') {
+                window.renderPosVouchers(selectedStudent);
+            }
+
             updateAdminUI();
         };
 
