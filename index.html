@@ -635,6 +635,50 @@
             updateAdminUI();
         };
 
+        window.renderPosVouchers = function(selectedStudent) {
+            const container = document.getElementById('pos-vouchers-container');
+            if (!container) return;
+
+            if (!selectedStudent || !selectedStudent.familyId) {
+                container.innerHTML = `<p class="text-slate-400 italic text-xs text-center py-2">No student selected. Use search above.</p>`;
+                return;
+            }
+
+            // Filter approved and unused vouchers for this student's family
+            const familyVouchers = (window.appData.vouchers || []).filter(v => 
+                v.familyId === selectedStudent.familyId && 
+                (v.status === 'approved' || v.status === 'Approved') && 
+                !v.isUsed
+            );
+
+            if (familyVouchers.length === 0) {
+                container.innerHTML = `<p class="text-slate-400 italic text-xs text-center py-2">No available approved vouchers for this student family.</p>`;
+                return;
+            }
+
+            // Render using your existing selectPosVoucher function
+            container.innerHTML = familyVouchers.map(v => {
+                const title = v.title || v.voucherName || 'Family Voucher';
+                const value = Number(v.value || v.discountAmount || 0);
+                const isSelected = window.appData.selectedVoucherId === v.id ? 'checked' : '';
+
+                return `
+                    <label class="flex items-center justify-between bg-white p-2 rounded-lg border text-xs cursor-pointer hover:border-indigo-500">
+                        <div class="flex items-center space-x-2">
+                            <input type="radio" name="pos-voucher-selection" value="${v.id}" ${isSelected} 
+                                onchange="window.selectPosVoucher('${v.id}', '${title.replace(/'/g, "\\'")}', ${value})" 
+                                class="text-indigo-600">
+                            <div>
+                                <span class="font-bold text-slate-800">${title}</span>
+                                <div class="text-[10px] text-slate-500">Value: RM ${value.toFixed(2)}</div>
+                            </div>
+                        </div>
+                        <span class="text-indigo-600 font-bold">RM ${value.toFixed(2)}</span>
+                    </label>
+                `;
+            }).join('');
+        };
+
         window.renderPosCart = function() {
             // Target the exact ID from your HTML snippet
             const container = document.getElementById('pos-cart-items-container');
