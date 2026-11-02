@@ -601,6 +601,30 @@
             }
         };
 
+        window.addCustomItemToCart = function(id, title, price, type) {
+            window.appData = window.appData || {};
+            window.appData.posCart = window.appData.posCart || [];
+
+            // Check if the item is already in the cart
+            const existingItem = window.appData.posCart.find(item => item.id === id);
+            if (existingItem) {
+                existingItem.qty = (existingItem.qty || 1) + 1;
+            } else {
+                window.appData.posCart.push({
+                    id: id,
+                    title: title,
+                    price: price,
+                    type: type,
+            qty: 1
+                });
+            }
+
+            // Recalculate totals and refresh the cart UI
+            if (typeof window.calculatePosCheckout === 'function') {
+                window.calculatePosCheckout();
+            }
+        };
+
         window.selectPosVoucher = function(voucherId, title, discountValue) {
             window.appData.selectedVoucherId = voucherId;
             window.appData.selectedVoucherDiscount = parseFloat(discountValue) || 0;
