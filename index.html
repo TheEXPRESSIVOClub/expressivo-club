@@ -615,13 +615,16 @@
                     title: title,
                     price: price,
                     type: type,
-            qty: 1
+                    qty: 1
                 });
             }
 
             // Recalculate totals and refresh the cart UI
             if (typeof window.calculatePosCheckout === 'function') {
                 window.calculatePosCheckout();
+            }
+            if (typeof window.renderPosCart === 'function') {
+                window.renderPosCart();
             }
         };
 
@@ -630,6 +633,50 @@
             window.appData.selectedVoucherDiscount = parseFloat(discountValue) || 0;
             window.appData.selectedVoucherTitle = title;
             updateAdminUI();
+        };
+
+        window.renderPosCart = function() {
+            // Find the container holding the cart items (matching your Current Checkout Cart box)
+            const cartContainer = document.getElementById('pos-cart-items') || document.querySelector('#current-checkout-cart-container') || document.querySelector('.space-y-2.text-xs');
+    
+            // Fallback: look for the container right above the subtotal section
+            const subtotalLabel = document.querySelector(':contains("Cart Subtotal")');
+            let container = cartContainer;
+    
+            if (!container && subtotalLabel) {
+                container = subtotalLabel.closest('div').previousElementSibling;
+            }
+
+            const cart = window.appData.posCart || [];
+
+            if (!container) return;
+
+            if (cart.length === 0) {
+                container.innerHTML = `<p class="text-slate-400 italic text-xs text-center py-4">No items added to cart yet.</p>`;
+                return;
+            }
+
+            container.innerHTML = cart.map((item, index) => `
+                <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg border text-xs mb-1.5">
+                    <div>
+                        <div class="font-bold text-slate-800">${item.title}</div>
+                        <div class="text-[10px] text-slate-500">Qty: ${item.qty} × RM ${Number(item.price).toFixed(2)}</div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-slate-900">RM ${(item.qty * item.price).toFixed(2)}</span>
+                        <button type="button" onclick="window.removeCartItem(${index})" class="text-red-500 hover:text-red-700 font-bold px-1.5 py-0.5 text-xs">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        // Helper function to remove items from cart
+        window.removeCartItem = function(index) {
+            if (window.appData && window.appData.posCart) {
+                window.appData.posCart.splice(index, 1);
+                if (typeof window.calculatePosCheckout === 'function') window.calculatePosCheckout();
+                if (typeof window.renderPosCart === 'function') window.renderPosCart();
+            }
         };
 
         window.calculatePosCheckout = function() {
