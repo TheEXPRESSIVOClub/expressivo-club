@@ -651,26 +651,28 @@
                 return;
             }
 
-            // Filter approved and unused vouchers for this student's family
-            const familyVouchers = (window.appData.vouchers || []).filter(v => 
-                v.familyId === selectedStudent.familyId && 
-                (v.status === 'approved' || v.status === 'Approved') && 
-                !v.isUsed
-            );
+            // Filter by familyId and ignore only those explicitly marked as used
+            const familyVouchers = (window.appData.vouchers || []).filter(v => {
+                if (v.familyId !== selectedStudent.familyId) return false;
+        
+                const status = (v.status || '').toLowerCase();
+                const isUsed = v.isUsed === true || status === 'used' || status === 'redeemed';
+        
+                return !isUsed;
+            });
 
             if (familyVouchers.length === 0) {
-                container.innerHTML = `<p class="text-slate-400 italic text-xs text-center py-2">No available approved vouchers for this student family.</p>`;
+                container.innerHTML = `<p class="text-slate-400 italic text-xs text-center py-2">No available vouchers for this family.</p>`;
                 return;
             }
 
-            // Render using your existing selectPosVoucher function
             container.innerHTML = familyVouchers.map(v => {
-                const title = v.title || v.voucherName || 'Family Voucher';
+                const title = v.title || v.voucherName || 'Birthday Perk / Voucher';
                 const value = Number(v.value || v.discountAmount || 0);
                 const isSelected = window.appData.selectedVoucherId === v.id ? 'checked' : '';
 
                 return `
-                    <label class="flex items-center justify-between bg-white p-2 rounded-lg border text-xs cursor-pointer hover:border-indigo-500">
+                    <label class="flex items-center justify-between bg-white p-2 rounded-lg border text-xs cursor-pointer hover:border-indigo-500 mb-1">
                         <div class="flex items-center space-x-2">
                             <input type="radio" name="pos-voucher-selection" value="${v.id}" ${isSelected} 
                                 onchange="window.selectPosVoucher('${v.id}', '${title.replace(/'/g, "\\'")}', ${value})" 
