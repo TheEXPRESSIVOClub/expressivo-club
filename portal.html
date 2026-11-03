@@ -426,19 +426,28 @@
             const studentName = (data.student?.name || '').trim().toLowerCase();
             const familyId = (data.student?.family || data.family?.id || '').trim();
 
-            // Flexible Filter: Matches by student name OR family ID, and ignores used/redeemed vouchers
-            const activeVouchers = (data.vouchers || []).filter(v => {
+            // 1. Filter & Deduplicate by Voucher ID
+            const rawVouchers = data.vouchers || [];
+            const seenIds = new Set();
+
+            const activeVouchers = rawVouchers.filter(v => {
                 const vStudent = (v.claimedBy || v.student || v.studentName || '').trim().toLowerCase();
                 const vFamily = (v.family || v.familyId || '').trim();
                 const statusLower = (v.status || '').toLowerCase();
 
-                // 1. Must match student name OR family ID
-                const belongsToUser = (vStudent === studentName) || (vStudent === '') || (familyId && vFamily === familyId);
+                // Must match student name OR family ID strictly
+                const belongsToUser = (studentName && vStudent === studentName) || (familyId && vFamily === familyId);
+                if (!belongsToUser) return false;
 
-                // 2. Must not be used or redeemed
+                // Must not be used or redeemed
                 const isNotUsed = !statusLower.includes('used') && !statusLower.includes('redeemed');
+                if (!isNotUsed) return false;
 
-                return belongsToUser && isNotUsed;
+                // Prevent rendering duplicate cards if array contains duplicate references
+                if (v.id && seenIds.has(v.id)) return false;
+                if (v.id) seenIds.add(v.id);
+
+                return true;
             });
 
             // Update notification badge count
@@ -463,7 +472,7 @@
                 return;
             }
 
-            // Render voucher cards
+            // Render clean voucher cards (Without Voucher Code)
             grid.innerHTML = activeVouchers.map(v => {
                 const isBirthday = v.isBirthdayPerk || (v.title && v.title.toLowerCase().includes('birthday'));
                 const discountText = v.discountAmount ? `RM ${v.discountAmount} OFF Workshop` : (v.description || 'Special Perk / Gift');
@@ -477,10 +486,6 @@
                             <h4 class="font-bold text-sm text-slate-800 mt-1.5">${v.title || 'Reward Voucher'}</h4>
                             <p class="text-xs text-slate-500 font-medium mt-0.5">${discountText}</p>
                             <p class="text-[10px] text-slate-400 mt-1">Status: <span class="font-bold text-emerald-600">${v.status || 'Available'}</span></p>
-                        </div>
-                        <div class="text-right">
-                            <span class="block text-[10px] font-bold text-slate-400 uppercase">Voucher Code</span>
-                            <span class="text-xs font-mono font-extrabold bg-white px-2.5 py-1 rounded-lg border text-slate-700 shadow-xs inline-block mt-0.5">${(v.id || 'PERK').slice(-6).toUpperCase()}</span>
                         </div>
                     </div>
                 `;
