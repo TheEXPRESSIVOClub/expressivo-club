@@ -421,47 +421,77 @@
             const grid = document.getElementById('my-bookings-grid');
             if (!grid) return;
 
-            const currentFamilyId = (data.student?.family || data.student?.familyId || data.family?.id || 'EX-001').trim().toUpperCase();
-    
-            // Pull bookings or registrations from portalData (adjust property name if your app uses 'bookings' or 'registrations')
-            const rawBookings = data.bookings || data.registrations || window.appData?.bookings || [];
+            // Retrieve active student name & family ID
+            const studentObj = data.student || {};
+            const currentFamilyId = (studentObj.family || studentObj.familyId || data.family?.id || 'EX-001').trim().toUpperCase();
+            const currentStudentName = (studentObj.name || '').trim().toLowerCase();
 
-            // Filter by family ID or student
-            const familyBookings = rawBookings.filter(b => {
-                const bFamily = (b.family || b.familyId || '').trim().toUpperCase();
-                return bFamily === currentFamilyId || !bFamily; // fallback if general
+            // 1. Check workshops array directly (where "Registered ✓" status comes from)
+            const allWorkshops = data.workshops || window.appData?.workshops || [];
+
+            // Filter workshops where this student/family is registered
+            const registeredWorkshops = allWorkshops.filter(w => {
+                // Check if workshop marks registration directly via status, flags, or enrolled arrays
+                const isRegisteredFlag = w.isRegistered === true || w.status === 'Registered';
+        
+                // Check enrolled students/families array if your backend uses arrays
+                const attendees = w.attendees || w.registeredStudents || w.enrolled || [];
+                const isInAttendees = attendees.some(a => {
+                    const aFam = (typeof a === 'string' ? a : a.family || a.familyId || '').trim().toUpperCase();
+                    const aName = (typeof a === 'string' ? a : a.name || a.studentName || '').trim().toLowerCase();
+                    return (currentFamilyId && aFam === currentFamilyId) || (currentStudentName && aName === currentStudentName);
+                });
+
+                // Check if workshop family property matches
+                const wFamily = (w.family || w.familyId || '').trim().toUpperCase();
+                const isFamilyMatch = currentFamilyId && (wFamily === currentFamilyId);
+
+                return isRegisteredFlag || isInAttendees || isFamilyMatch;
             });
 
-            if (familyBookings.length === 0) {
+            // 2. Fallback check if separate bookings array exists
+            const separateBookings = data.bookings || data.registrations || [];
+            const allBooked = [...registeredWorkshops, ...separateBookings];
+
+            // Empty State
+            if (allBooked.length === 0) {
                 grid.innerHTML = `
-                    <div class="col-span-full text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    <div class="col-span-full text-center py-10 text-slate-400">
                         <p class="text-3xl mb-2">📅</p>
-                        <p class="text-sm font-semibold text-slate-600">No workshop bookings found</p>
-                        <p class="text-xs text-slate-400 mt-1">Explore the Workshops & Events tab to register your child for upcoming classes!</p>
+                        <p class="text-sm font-semibold text-slate-600">No registered workshops found</p>
+                        <p class="text-xs text-slate-400 mt-1">Book a workshop under the Workshops & Events tab to see it here!</p>
                     </div>
                 `;
                 return;
             }
 
-            grid.innerHTML = familyBookings.map(b => {
+            // Render registered workshop cards
+            grid.innerHTML = allBooked.map(w => {
+                const title = w.title || w.workshopTitle || 'Registered Workshop';
+                const date = w.date || w.workshopDate || 'TBD';
+                const time = w.time || w.workshopTime || 'TBD';
+                const teacher = w.teacher || w.instructor || 'Teacher Jennifer';
+
                 return `
                     <div class="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm flex flex-col justify-between">
                         <div>
                             <div class="flex justify-between items-start mb-2">
                                 <span class="px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 rounded-full">
-                                    Confirmed ✓
+                                    Registered ✓
                                 </span>
-                                <span class="text-xs text-slate-400 font-medium">Student: ${b.studentName || data.student?.name || 'Student'}</span>
+                                <span class="text-xs text-slate-400 font-medium">${studentObj.name || 'Student'}</span>
                             </div>
-                            <h4 class="font-bold text-slate-800 text-base">${b.workshopTitle || b.title || 'Workshop'}</h4>
-                            <p class="text-xs text-slate-500 mt-2">📅 Date: <span class="font-semibold text-slate-700">${b.date || 'TBD'}</span></p>
-                            <p class="text-xs text-slate-500 mt-1">⏰ Time: <span class="font-semibold text-slate-700">${b.time || 'TBD'}</span></p>
-                            <p class="text-xs text-slate-500 mt-1">👨‍🏫 Teacher: <span class="font-semibold text-slate-700">${b.teacher || 'TBD'}</span></p>
+                            <h4 class="font-bold text-slate-800 text-base">${title}</h4>
+                            <div class="mt-3 space-y-1 text-xs text-slate-500">
+                                <p>📅 Date: <span class="font-semibold text-slate-700">${date}</span></p>
+                                <p>⏰ Time: <span class="font-semibold text-slate-700">${time}</span></p>
+                                <p>👨‍🏫 Teacher: <span class="font-semibold text-slate-700">${teacher}</span></p>
+                            </div>
                         </div>
                     </div>
                 `;
             }).join('');
-         }
+        }
 
         function renderMyRewards() {
             const data = window.portalData || {};
