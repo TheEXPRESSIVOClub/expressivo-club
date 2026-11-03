@@ -517,16 +517,8 @@
             const resultsContainer = document.getElementById('pos-student-search-results');
             if (resultsContainer) resultsContainer.classList.add('hidden');
 
-            // 1. Refresh the admin UI first
+            // Refreshing the admin UI automatically draws the student details and their valid vouchers!
             updateAdminUI();
-
-            // 2. Render the vouchers AFTER the UI updates so they stay visible
-            const allStudents = window.appData.students || [];
-            const selectedStudent = allStudents.find(s => s.id === studentId);
-
-            if (selectedStudent && typeof window.renderPosVouchers === 'function') {
-                window.renderPosVouchers(selectedStudent);
-            }
         };
 
        // Switch between 'workshop' and 'merchandise'
