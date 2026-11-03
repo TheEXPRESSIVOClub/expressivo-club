@@ -1047,13 +1047,30 @@
             // Update POS Vouchers
             const posVouchersContainer = document.getElementById('pos-vouchers-container');
             if (posVouchersContainer) {
-                const student = window.appData.students.find(s => s.id === window.appData.activePosStudentId);
-                const familyKey = student ? student.family : null;
-                const famVouchers = window.appData.vouchers.filter(v => v.family === familyKey && v.status === 'Approved & Available');
-                
-                posVouchersContainer.innerHTML = famVouchers.length === 0 ? '<p class="text-xs text-slate-400 italic">No available approved vouchers for this student family.</p>' : famVouchers.map(v => {
-    let discountVal = Number(v.discount) || 0;
-    let titleLower = (v.title || '').toLowerCase();
+            const student = window.appData.students.find(s => s.id === window.appData.activePosStudentId);
+            const familyKey = student ? (student.familyId || student.family) : null;
+    
+            // Flexible filter: matches family, ignores used vouchers, and hides unapproved/pending perks
+            const famVouchers = (window.appData.vouchers || []).filter(v => {
+                const vFamily = v.familyId || v.family;
+                if (!familyKey || vFamily !== familyKey) return false;
+        
+                const status = (v.status || '').toLowerCase();
+                const isUsed = v.isUsed === true || status === 'used' || status === 'redeemed';
+        
+                if (isUsed) return false;
+        
+                // Hide vouchers that are still waiting for admin approval
+                if (status.includes('to redeem') || status.includes('pending')) {
+                    return false;
+                }
+        
+                return true;
+            });
+    
+            posVouchersContainer.innerHTML = famVouchers.length === 0 ? '<p class="text-xs text-slate-400 italic">No available vouchers for this student family.</p>' : famVouchers.map(v => {
+            let discountVal = Number(v.value || v.discount) || 0;
+            let titleLower = (v.title || v.voucherName || '').toLowerCase();
     
     // Determine discount dynamically based on voucher title / star redemption tier
     if (titleLower.includes('free') || titleLower.includes('1000')) {
