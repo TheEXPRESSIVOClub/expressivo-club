@@ -775,8 +775,14 @@
                 return;
             }
 
-            const activeCart = window.cart || window.posCart || (typeof cart !== 'undefined' ? cart : []);
-            if (!activeCart || activeCart.length === 0) {
+            // Fallback check: check all possible variable names or local scope
+            const currentCart = window.cart || window.posCart || window.checkoutCart || (typeof cart !== 'undefined' ? cart : []);
+
+            // If the array is empty, let's also check if the subtotal display on the screen is greater than 0
+            const subtotalElement = document.getElementById('cart-subtotal') || document.querySelector('.cart-subtotal');
+            const hasSubtotal = subtotalElement && parseFloat(subtotalElement.innerText.replace(/[^0-9.]/g, '')) > 0;
+
+            if ((!currentCart || currentCart.length === 0) && !hasSubtotal) {
                 alert("Please select an item or workshop first!");
                 return;
             }
