@@ -416,6 +416,53 @@
                 }).join('');
         }
 
+        function renderMyBookings() {
+            const data = window.portalData || {};
+            const grid = document.getElementById('my-bookings-grid');
+            if (!grid) return;
+
+            const currentFamilyId = (data.student?.family || data.student?.familyId || data.family?.id || 'EX-001').trim().toUpperCase();
+    
+            // Pull bookings or registrations from portalData (adjust property name if your app uses 'bookings' or 'registrations')
+            const rawBookings = data.bookings || data.registrations || window.appData?.bookings || [];
+
+            // Filter by family ID or student
+            const familyBookings = rawBookings.filter(b => {
+                const bFamily = (b.family || b.familyId || '').trim().toUpperCase();
+                return bFamily === currentFamilyId || !bFamily; // fallback if general
+            });
+
+            if (familyBookings.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                        <p class="text-3xl mb-2">📅</p>
+                        <p class="text-sm font-semibold text-slate-600">No workshop bookings found</p>
+                        <p class="text-xs text-slate-400 mt-1">Explore the Workshops & Events tab to register your child for upcoming classes!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = familyBookings.map(b => {
+                return `
+                    <div class="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 rounded-full">
+                                    Confirmed ✓
+                                </span>
+                                <span class="text-xs text-slate-400 font-medium">Student: ${b.studentName || data.student?.name || 'Student'}</span>
+                            </div>
+                            <h4 class="font-bold text-slate-800 text-base">${b.workshopTitle || b.title || 'Workshop'}</h4>
+                            <p class="text-xs text-slate-500 mt-2">📅 Date: <span class="font-semibold text-slate-700">${b.date || 'TBD'}</span></p>
+                            <p class="text-xs text-slate-500 mt-1">⏰ Time: <span class="font-semibold text-slate-700">${b.time || 'TBD'}</span></p>
+                            <p class="text-xs text-slate-500 mt-1">👨‍🏫 Teacher: <span class="font-semibold text-slate-700">${b.teacher || 'TBD'}</span></p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+         }
+
         function renderMyRewards() {
             const data = window.portalData || {};
             const grid = document.getElementById('my-rewards-grid');
