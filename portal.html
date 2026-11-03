@@ -82,6 +82,7 @@
                 window.portalData.workshops = [];
                 snapshot.forEach(d => window.portalData.workshops.push({ id: d.id, ...d.data() }));
                 renderWorkshops();
+                if (typeof renderMyBookings === 'function') renderMyBookings();
             });
 
             onSnapshot(collection(db, "transactions"), (snapshot) => {
