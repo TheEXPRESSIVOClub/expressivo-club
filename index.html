@@ -775,8 +775,8 @@
                 return;
             }
 
-            const wsSelect = document.getElementById('pos-ws-select');
-            if (!wsSelect || wsSelect.options.length === 0 || !wsSelect.value) {
+            const activeCart = window.cart || window.posCart || (typeof cart !== 'undefined' ? cart : []);
+            if (!activeCart || activeCart.length === 0) {
                 alert("Please select an item or workshop first!");
                 return;
             }
