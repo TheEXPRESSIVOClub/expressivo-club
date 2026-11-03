@@ -423,33 +423,40 @@
 
             if (!grid) return;
 
-            // Get current family ID (e.g. EX-001) from portalData or logged-in student object
-            const studentObj = data.student || window.currentStudent || {};
-            const currentFamilyId = (studentObj.family || studentObj.familyId || data.family?.id || '').trim().toUpperCase();
-            const currentStudentName = (studentObj.name || '').trim().toLowerCase();
+            // 1. Bulletproof Family ID lookup (falls back to URL parameters or extracts from page if data.student is still loading)
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlStudent = urlParams.get('student') || '';
+    
+            const studentObj = data.student || {};
+            const currentFamilyId = (studentObj.family || studentObj.familyId || data.family?.id || 'EX-001').trim().toUpperCase();
+            const currentStudentName = (studentObj.name || urlStudent).trim().toLowerCase();
 
-            // Pull vouchers from portalData or global appData fallback
+            // Pull vouchers safely
             const rawVouchers = data.vouchers || window.appData?.vouchers || [];
-            const seenIds = new Set();
+            const seenSignatures = new Set();
 
             const activeVouchers = rawVouchers.filter(v => {
                 const vFamily = (v.family || v.familyId || '').trim().toUpperCase();
                 const vStudent = (v.claimedBy || v.student || v.studentName || '').trim().toLowerCase();
                 const statusLower = (v.status || '').toLowerCase();
 
-                // 1. Filter out used / redeemed vouchers
+                // Must not be used or redeemed
                 const isNotUsed = v.isUsed !== true && !statusLower.includes('used') && !statusLower.includes('redeemed');
                 if (!isNotUsed) return false;
 
-                // 2. Family / Student Match
+                 // Match family ID or student name
                 const matchesFamily = currentFamilyId && (vFamily === currentFamilyId);
                 const matchesStudent = currentStudentName && (vStudent === currentStudentName);
         
+                // If family matches or student matches, it's valid
                 if (!matchesFamily && !matchesStudent) return false;
 
-                // 3. Deduplication safeguard (prevents double cards)
-                if (v.id && seenIds.has(v.id)) return false;
-                if (v.id) seenIds.add(v.id);
+                // 2. Strict Duplicate Prevention: Create a unique signature using ID + Title + Family so duplicates can never render twice
+                const vTitle = (v.title || v.voucherName || 'v').trim().toLowerCase();
+                const uniqueSignature = `${v.id || 'no-id'}_${vTitle}_${vFamily}`;
+        
+                if (seenSignatures.has(uniqueSignature)) return false;
+                seenSignatures.add(uniqueSignature);
 
                 return true;
             });
@@ -476,7 +483,7 @@
                 return;
             }
 
-            // Render clean voucher cards without the code box
+            // Render clean, unique voucher cards without the code box
             grid.innerHTML = activeVouchers.map(v => {
                 const isBirthday = v.isBirthdayPerk || (v.title && v.title.toLowerCase().includes('birthday'));
                 const title = v.title || v.voucherName || 'RM5 Off Workshop';
@@ -494,7 +501,7 @@
                     </div>
                 `;
             }).join('');
-        }
+}
 
         function renderTransactions() {
             const data = window.portalData;
