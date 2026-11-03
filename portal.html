@@ -423,10 +423,12 @@
 
             if (!grid) return;
 
-            // Get current family ID (e.g., EX-001) exactly like the workshop booking modal does
-            const currentFamilyId = (data.student?.family || data.student?.familyId || data.family?.id || '').trim().toUpperCase();
-            const currentStudentName = (data.student?.name || '').trim().toLowerCase();
+            // Get current family ID (e.g. EX-001) from portalData or logged-in student object
+            const studentObj = data.student || window.currentStudent || {};
+            const currentFamilyId = (studentObj.family || studentObj.familyId || data.family?.id || '').trim().toUpperCase();
+            const currentStudentName = (studentObj.name || '').trim().toLowerCase();
 
+            // Pull vouchers from portalData or global appData fallback
             const rawVouchers = data.vouchers || window.appData?.vouchers || [];
             const seenIds = new Set();
 
@@ -435,18 +437,17 @@
                 const vStudent = (v.claimedBy || v.student || v.studentName || '').trim().toLowerCase();
                 const statusLower = (v.status || '').toLowerCase();
 
-                // 1. Strict status check: Must not be used or redeemed
+                // 1. Filter out used / redeemed vouchers
                 const isNotUsed = v.isUsed !== true && !statusLower.includes('used') && !statusLower.includes('redeemed');
                 if (!isNotUsed) return false;
 
-                // 2. Family / Student Match (Matches EX-001)
+                // 2. Family / Student Match
                 const matchesFamily = currentFamilyId && (vFamily === currentFamilyId);
                 const matchesStudent = currentStudentName && (vStudent === currentStudentName);
         
-                // Match if it belongs to family OR student
                 if (!matchesFamily && !matchesStudent) return false;
 
-                // 3. Prevent duplicate card rendering if same voucher object is in array twice
+                // 3. Deduplication safeguard (prevents double cards)
                 if (v.id && seenIds.has(v.id)) return false;
                 if (v.id) seenIds.add(v.id);
 
@@ -475,7 +476,7 @@
                 return;
             }
 
-            // Render cards (Matching workshop voucher names)
+            // Render clean voucher cards without the code box
             grid.innerHTML = activeVouchers.map(v => {
                 const isBirthday = v.isBirthdayPerk || (v.title && v.title.toLowerCase().includes('birthday'));
                 const title = v.title || v.voucherName || 'RM5 Off Workshop';
