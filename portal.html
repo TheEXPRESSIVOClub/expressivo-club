@@ -416,83 +416,6 @@
                 }).join('');
         }
 
-        function renderMyBookings() {
-            const data = window.portalData || {};
-            const grid = document.getElementById('my-bookings-grid');
-            if (!grid) return;
-
-            // Retrieve active student name & family ID
-            const studentObj = data.student || {};
-            const currentFamilyId = (studentObj.family || studentObj.familyId || data.family?.id || 'EX-001').trim().toUpperCase();
-            const currentStudentName = (studentObj.name || '').trim().toLowerCase();
-
-            // 1. Check workshops array directly (where "Registered ✓" status comes from)
-            const allWorkshops = data.workshops || window.appData?.workshops || [];
-
-            // Filter workshops where this student/family is registered
-            const registeredWorkshops = allWorkshops.filter(w => {
-                // Check if workshop marks registration directly via status, flags, or enrolled arrays
-                const isRegisteredFlag = w.isRegistered === true || w.status === 'Registered';
-        
-                // Check enrolled students/families array if your backend uses arrays
-                const attendees = w.attendees || w.registeredStudents || w.enrolled || [];
-                const isInAttendees = attendees.some(a => {
-                    const aFam = (typeof a === 'string' ? a : a.family || a.familyId || '').trim().toUpperCase();
-                    const aName = (typeof a === 'string' ? a : a.name || a.studentName || '').trim().toLowerCase();
-                    return (currentFamilyId && aFam === currentFamilyId) || (currentStudentName && aName === currentStudentName);
-                });
-
-                // Check if workshop family property matches
-                const wFamily = (w.family || w.familyId || '').trim().toUpperCase();
-                const isFamilyMatch = currentFamilyId && (wFamily === currentFamilyId);
-
-                return isRegisteredFlag || isInAttendees || isFamilyMatch;
-            });
-
-            // 2. Fallback check if separate bookings array exists
-            const separateBookings = data.bookings || data.registrations || [];
-            const allBooked = [...registeredWorkshops, ...separateBookings];
-
-            // Empty State
-            if (allBooked.length === 0) {
-                grid.innerHTML = `
-                    <div class="col-span-full text-center py-10 text-slate-400">
-                        <p class="text-3xl mb-2">📅</p>
-                        <p class="text-sm font-semibold text-slate-600">No registered workshops found</p>
-                        <p class="text-xs text-slate-400 mt-1">Book a workshop under the Workshops & Events tab to see it here!</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // Render registered workshop cards
-            grid.innerHTML = allBooked.map(w => {
-                const title = w.title || w.workshopTitle || 'Registered Workshop';
-                const date = w.date || w.workshopDate || 'TBD';
-                const time = w.time || w.workshopTime || 'TBD';
-                const teacher = w.teacher || w.instructor || 'Teacher Jennifer';
-
-                return `
-                    <div class="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm flex flex-col justify-between">
-                        <div>
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 rounded-full">
-                                    Registered ✓
-                                </span>
-                                <span class="text-xs text-slate-400 font-medium">${studentObj.name || 'Student'}</span>
-                            </div>
-                            <h4 class="font-bold text-slate-800 text-base">${title}</h4>
-                            <div class="mt-3 space-y-1 text-xs text-slate-500">
-                                <p>📅 Date: <span class="font-semibold text-slate-700">${date}</span></p>
-                                <p>⏰ Time: <span class="font-semibold text-slate-700">${time}</span></p>
-                                <p>👨‍🏫 Teacher: <span class="font-semibold text-slate-700">${teacher}</span></p>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
         function renderMyRewards() {
             const data = window.portalData || {};
             const grid = document.getElementById('my-rewards-grid');
@@ -710,8 +633,7 @@
         <div class="flex bg-white p-2 rounded-xl shadow-sm border space-x-2 text-xs sm:text-sm font-semibold overflow-x-auto">
             <button onclick="switchTab('dashboard')" id="tab-dashboard" class="px-4 py-2 bg-slate-900 text-white rounded-lg whitespace-nowrap">🏠 Dashboard</button>
             <button onclick="switchTab('rewards')" id="tab-rewards" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">🎁 Rewards Catalog</button>
-            <button onclick="switchTab('workshops')" id="tab-workshops" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">🎶 Workshops & Events</button>
-            <button onclick="switchTab('my-bookings')" id="tab-my-bookings" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">📅 My Bookings</button>
+            <button onclick="switchTab('workshops')" id="tab-workshops" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">📅 Workshops & Events</button>
             <button onclick="switchTab('my-rewards')" id="tab-my-rewards" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap">🎟️ My Rewards</button>
         </div>
 
@@ -755,15 +677,7 @@
             </div>
         </div>
 
-        <!-- TAB 4: MY BOOKINGS -->
-        <div id="content-my-bookings" class="hidden space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                <h2 class="text-lg font-bold text-slate-800 border-b pb-3">My Registered Workshops</h2>
-                <div id="my-bookings-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            </div>
-        </div>
-
-       <!-- TAB 5: MY REWARDS -->
+       <!-- TAB 4: MY REWARDS -->
        <div id="content-my-rewards" class="hidden space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
                 <div class="flex justify-between items-center border-b pb-3">
@@ -779,7 +693,7 @@
         
     <script>
         function switchTab(tab) {
-            ['dashboard', 'rewards', 'workshops', 'my-bookings', 'my-rewards'].forEach(t => {
+            ['dashboard', 'rewards', 'workshops', 'my-rewards'].forEach(t => {
                 document.getElementById(`content-${t}`).classList.add('hidden');
                 document.getElementById(`tab-${t}`).className = "px-4 py-2 bg-slate-100 text-slate-600 rounded-lg whitespace-nowrap";
             });
