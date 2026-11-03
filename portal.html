@@ -417,40 +417,43 @@
         }
 
         function renderMyRewards() {
-            const data = window.portalData;
+            const data = window.portalData || {};
             const grid = document.getElementById('my-rewards-grid');
             const badge = document.getElementById('my-rewards-badge');
 
-            if (!grid || !data) return;
+            if (!grid) return;
 
-            const studentName = (data.student?.name || '').trim().toLowerCase();
-            const familyId = (data.student?.family || data.family?.id || '').trim();
+            // Get current family ID (e.g., EX-001) exactly like the workshop booking modal does
+            const currentFamilyId = (data.student?.family || data.student?.familyId || data.family?.id || '').trim().toUpperCase();
+            const currentStudentName = (data.student?.name || '').trim().toLowerCase();
 
-            // 1. Filter & Deduplicate by Voucher ID
-            const rawVouchers = data.vouchers || [];
+            const rawVouchers = data.vouchers || window.appData?.vouchers || [];
             const seenIds = new Set();
 
             const activeVouchers = rawVouchers.filter(v => {
+                const vFamily = (v.family || v.familyId || '').trim().toUpperCase();
                 const vStudent = (v.claimedBy || v.student || v.studentName || '').trim().toLowerCase();
-                const vFamily = (v.family || v.familyId || '').trim();
                 const statusLower = (v.status || '').toLowerCase();
 
-                // Must match student name OR family ID strictly
-                const belongsToUser = (studentName && vStudent === studentName) || (familyId && vFamily === familyId);
-                if (!belongsToUser) return false;
-
-                // Must not be used or redeemed
-                const isNotUsed = !statusLower.includes('used') && !statusLower.includes('redeemed');
+                // 1. Strict status check: Must not be used or redeemed
+                const isNotUsed = v.isUsed !== true && !statusLower.includes('used') && !statusLower.includes('redeemed');
                 if (!isNotUsed) return false;
 
-                // Prevent rendering duplicate cards if array contains duplicate references
+                // 2. Family / Student Match (Matches EX-001)
+                const matchesFamily = currentFamilyId && (vFamily === currentFamilyId);
+                const matchesStudent = currentStudentName && (vStudent === currentStudentName);
+        
+                // Match if it belongs to family OR student
+                if (!matchesFamily && !matchesStudent) return false;
+
+                // 3. Prevent duplicate card rendering if same voucher object is in array twice
                 if (v.id && seenIds.has(v.id)) return false;
                 if (v.id) seenIds.add(v.id);
 
                 return true;
             });
 
-            // Update notification badge count
+            // Update notification badge count on the tab
             if (badge) {
                 if (activeVouchers.length > 0) {
                     badge.innerText = activeVouchers.length;
@@ -472,10 +475,11 @@
                 return;
             }
 
-            // Render clean voucher cards (Without Voucher Code)
+            // Render cards (Matching workshop voucher names)
             grid.innerHTML = activeVouchers.map(v => {
                 const isBirthday = v.isBirthdayPerk || (v.title && v.title.toLowerCase().includes('birthday'));
-                const discountText = v.discountAmount ? `RM ${v.discountAmount} OFF Workshop` : (v.description || 'Special Perk / Gift');
+                const title = v.title || v.voucherName || 'RM5 Off Workshop';
+                const statusText = v.status || 'Available';
 
                 return `
                     <div class="p-4 rounded-2xl border ${isBirthday ? 'border-pink-200 bg-gradient-to-r from-pink-50 to-rose-50' : 'border-indigo-100 bg-slate-50'} flex justify-between items-center shadow-sm">
@@ -483,9 +487,8 @@
                             <span class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${isBirthday ? 'bg-pink-100 text-pink-700' : 'bg-indigo-100 text-indigo-700'}">
                                 ${isBirthday ? '🎉 Birthday Perk' : '⭐ Star Reward'}
                             </span>
-                            <h4 class="font-bold text-sm text-slate-800 mt-1.5">${v.title || 'Reward Voucher'}</h4>
-                            <p class="text-xs text-slate-500 font-medium mt-0.5">${discountText}</p>
-                            <p class="text-[10px] text-slate-400 mt-1">Status: <span class="font-bold text-emerald-600">${v.status || 'Available'}</span></p>
+                            <h4 class="font-bold text-sm text-slate-800 mt-1.5">${title}</h4>
+                            <p class="text-[11px] text-emerald-600 font-semibold mt-1">Status: ${statusText}</p>
                         </div>
                     </div>
                 `;
