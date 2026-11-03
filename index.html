@@ -775,24 +775,22 @@
                 return;
             }
 
-            const activeCart = window.appData?.posCart || window.cart || window.posCart || [];
-            
+            const activeCart = window.appData?.posCart || window.cart || [];
             if (!activeCart || activeCart.length === 0) {
                 alert("Please select an item or workshop first!");
                 return;
             }
-            
-            const mode = window.appData.posMode || 'workshop';
-            const itemId = wsSelect.value;
-            const itemTitle = wsSelect.options[wsSelect.selectedIndex].text.split(' - ')[0];
-            const basePrice = parseFloat(document.getElementById('pos-original-price').value) || 0;
+
             const familyKey = student.family;
             const family = window.appData.families[familyKey] || { tier: 'Prelude', stars: 100, wallet: 0 };
 
+            // Calculate total base price of all items in cart
+            const subtotal = activeCart.reduce((sum, item) => sum + ((item.qty || 1) * Number(item.price || 0)), 0);
+
             let tierDiscountRate = family.tier === 'Crescendo' ? 0.05 : family.tier === 'Virtuoso' ? 0.10 : 0;
-            const tierDiscountAmount = basePrice * tierDiscountRate;
+            const tierDiscountAmount = subtotal * tierDiscountRate;
             const voucherDiscount = window.appData.selectedVoucherDiscount || 0;
-            const netAmount = Math.max(0, basePrice - tierDiscountAmount - voucherDiscount);
+            const netAmount = Math.max(0, subtotal - tierDiscountAmount - voucherDiscount);
             const starsEarned = Math.round(netAmount / 2);
 
             const currentWallet = Number(family.wallet || 0);
@@ -811,15 +809,21 @@
                 const famRef = doc(db, "families", familyKey);
                 await setDoc(famRef, { wallet: newWallet, stars: newStars }, { merge: true });
 
-                // 2. If Workshop Mode, register student in workshop collection
-                if (mode === 'workshop') {
-                    const wsObj = window.appData.workshops.find(w => w.id === itemId);
-                    if (wsObj) {
-                        const currentRegistered = wsObj.registered || [];
-                        const alreadyRegistered = currentRegistered.some(r => (typeof r === 'string' ? r === student.name : r.name === student.name));
-                        if (!alreadyRegistered) {
-                            currentRegistered.push({ name: student.name, family: familyKey, feePaid: netAmount });
-                            await updateDoc(doc(db, "workshops", itemId), { registered: currentRegistered });
+                // 2. Loop through cart items to process workshop registrations if applicable
+                const itemTitles = [];
+                for (const item of activeCart) {
+                    itemTitles.push(`${item.title} (Qty: ${item.qty || 1})`);
+            
+                    // If item is a workshop, register student in workshop collection
+                    if (item.type === 'workshop' || item.id?.startsWith('ws_') || item.instructor || item.date) {
+                        const wsObj = window.appData.workshops.find(w => w.id === item.id);
+                        if (wsObj) {
+                            const currentRegistered = wsObj.registered || [];
+                            const alreadyRegistered = currentRegistered.some(r => (typeof r === 'string' ? r === student.name : r.name === student.name));
+                            if (!alreadyRegistered) {
+                                currentRegistered.push({ name: student.name, family: familyKey, feePaid: ((item.qty || 1) * item.price) });
+                                await updateDoc(doc(db, "workshops", item.id), { registered: currentRegistered });
+                            }
                         }
                     }
                 }
@@ -830,13 +834,13 @@
                 }
 
                 // 4. Record Audit Transaction
-                const descPrefix = mode === 'workshop' ? 'Workshop Purchase' : 'Merchandise Sale';
+                const combinedTitles = itemTitles.join(', ');
                 await addDoc(collection(db, "transactions"), {
-                    date: `${now.toISOString().split('T')[0]} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+                    date: `${now.toISOString().split('T')[0]} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,    
                     student: student.name,
                     entity: `${student.name} (Processed by ${staffName})`,
                     family: familyKey,
-                    desc: `POS ${descPrefix}: ${itemTitle} (Voucher: ${window.appData.selectedVoucherTitle})`,
+                    desc: `POS Checkout: ${combinedTitles} (Voucher: ${window.appData.selectedVoucherTitle || 'None'})`,
                     amount: `- RM ${netAmount.toFixed(2)}`,
                     starsChange: `+${starsEarned} ⭐`,
                     timestamp: now
@@ -844,17 +848,19 @@
 
                 // 5. Render WhatsApp Receipt Modal
                 showReceiptModal({
-                    studentName: student.name,
+                    studentName: student.name,    
                     familyKey: familyKey,
-                    itemTitle: itemTitle,
-                    itemType: mode === 'workshop' ? 'Workshop Event' : 'Merchandise Item',
+                    itemTitle: combinedTitles,
+                    itemType: 'Cart Checkout',
                     netAmount: netAmount,
                     remainingWallet: newWallet,
                     starsEarned: starsEarned,
                     totalStars: newStars
                 });
-        
-                // Reset state
+
+                // Reset cart and voucher state
+                window.appData.posCart = [];
+                if (typeof window.renderPosCart === 'function') window.renderPosCart();
                 window.appData.selectedVoucherId = null;
                 window.appData.selectedVoucherDiscount = 0;
                 window.appData.selectedVoucherTitle = "None";
