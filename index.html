@@ -1004,10 +1004,14 @@
                             </div>
 
                             <!-- Student Cancellation with Remarks Section -->
-                            <div class="border-t pt-3 space-y-2">
+                            <div class="flex items-center justify-between">
                                 <h4 class="font-bold text-slate-800 text-xs flex items-center gap-1">
                                     <span>🎓</span> Registered Students (${registeredList.length})
                                 </h4>
+                                <button type="button" onclick="exportWorkshopAttendance('${w.id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[10px] shadow transition flex items-center gap-1">
+                                    📊 Export Attendance CSV
+                                </button>
+                            </div>
                                 ${registeredList.length === 0 ? '<p class="text-xs text-slate-400 italic">No students registered yet for this workshop.</p>' : `
                                     <div class="bg-slate-50 rounded-xl border p-2 space-y-2">
                                         ${registeredList.map(regItem => {
