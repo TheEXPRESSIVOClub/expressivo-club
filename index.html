@@ -197,6 +197,28 @@
             }
         };
 
+        window.sendWhatsAppPortalLink = function(studentName, familyId, phone) {
+            if (!phone) {
+                alert("No contact phone number available for this family!");
+                return;
+            }
+
+            // Clean phone number and ensure country code format (e.g. Malaysia 60)
+            let cleanPhone = phone.replace(/[^0-9]/g, '');
+            if (cleanPhone.startsWith('0')) {
+                cleanPhone = '6' + cleanPhone; // Automatically formats 012-345-6789 to 60123456789 for WhatsApp
+            }
+
+            // Your portal URL (passing the family ID automatically in the link)
+            const portalUrl = `https://theexpressivoclub.github.io/?family=${familyId}`;
+
+            const message = `Hi! Welcome to Expressivo Club! 🎹\n\nYou can check ${studentName}'s star balance, view registered workshops, and check your family wallet anytime using our Parent Portal:\n\n${portalUrl}\n\nYour Family ID: *${familyId}*\n\n*Tip: Open this link in your browser and select "Add to Home Screen" to use it like an app!*`;
+
+            const encodedMessage = encodeURIComponent(message);
+            const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+            window.open(whatsappUrl, '_blank');
+        };
+
         window.deleteStudent = async function(studentId, studentName, familyId) {
             if (!confirm(`Are you sure you want to remove student "${studentName}"?`)) return;
             try {
@@ -994,6 +1016,7 @@
                             <td class="p-3 font-bold text-amber-600">${fam.stars || 100} ⭐</td>
                             <td class="p-3 text-right space-x-1">
                                 <button onclick="openParentPortal('${s.name}')" class="px-2.5 py-1 bg-indigo-600 text-white font-bold rounded text-[10px] hover:bg-indigo-700">Portal</button>
+                                <button onclick="sendWhatsAppPortalLink('${s.name}', '${s.family}', '${s.phone}')" class="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded text-[10px] hover:bg-emerald-700">💬 WhatsApp</button>
                                 <button onclick="adjustWallet('${s.family}')" class="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded text-[10px] hover:bg-emerald-700">Wallet</button>
                                 <button onclick="addReferralStarsWithRemark('${s.family}')" class="px-2.5 py-1 bg-amber-600 text-white font-bold rounded text-[10px] hover:bg-amber-700">+Ref</button>
                                 <button onclick="adjustManualStars('${s.family}')" class="px-2.5 py-1 bg-purple-600 text-white font-bold rounded text-[10px] hover:bg-purple-700">Stars</button>
