@@ -551,28 +551,6 @@
             resultsContainer.classList.remove('hidden');
         };
 
-        window.sendWhatsAppPortalLink = function(studentName, familyId, phone) {
-            if (!phone) {
-                alert("No contact phone number available for this family!");
-                return;
-            }
-
-            // Clean phone number and ensure country code format (e.g. Malaysia 60)
-            let cleanPhone = phone.replace(/[^0-9]/g, '');
-            if (cleanPhone.startsWith('0')) {
-                cleanPhone = '6' + cleanPhone; // Automatically formats 012-345-6789 to 60123456789 for WhatsApp
-            }
-
-            // Your portal URL (passing the family ID automatically in the link)
-            const portalUrl = `https://theexpressivoclub.github.io/?family=${familyId}`;
-
-            const message = `Hi! Welcome to Expressivo Club! 🎹\n\nYou can check ${studentName}'s star balance, view registered workshops, and check your family wallet anytime using our Parent Portal:\n\n${portalUrl}\n\nYour Family ID: *${familyId}*\n\n*Tip: Open this link in your browser and select "Add to Home Screen" to use it like an app!*`;
-
-            const encodedMessage = encodeURIComponent(message);
-            const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
-            window.open(whatsappUrl, '_blank');
-        };
-
         window.selectPosStudent = function(studentId, studentName) {
             window.appData.activePosStudentId = studentId;
             window.appData.selectedVoucherId = null;
@@ -1020,10 +998,6 @@
                                 <button onclick="addReferralStarsWithRemark('${s.family}')" class="px-2.5 py-1 bg-amber-600 text-white font-bold rounded text-[10px] hover:bg-amber-700">+Ref</button>
                                 <button onclick="adjustManualStars('${s.family}')" class="px-2.5 py-1 bg-purple-600 text-white font-bold rounded text-[10px] hover:bg-purple-700">Stars</button>
                                 <button onclick="deleteStudent('${s.id}', '${s.name}', '${s.family}')" class="px-2.5 py-1 bg-rose-600 text-white font-bold rounded text-[10px] hover:bg-rose-700">Del</button>
-                                <button onclick="sendWhatsAppPortalLink('${student.name}', '${student.family}', '${student.phone}')" 
-                                        class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px] shadow-sm transition flex items-center gap-1">
-                                    💬 WhatsApp
-                                </button>
                             </td>
                         </tr>
                     `;
