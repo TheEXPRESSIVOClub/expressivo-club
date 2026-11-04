@@ -443,6 +443,52 @@
             }
         };
 
+        window.exportWorkshopAttendance = function(workshopId) {
+            const workshops = window.appData?.workshops || [];
+            const workshop = workshops.find(w => w.id === workshopId);
+
+            if (!workshop) {
+                alert("Workshop not found!");
+                return;
+            }
+
+            const attendees = workshop.registered || [];
+
+            if (attendees.length === 0) {
+                alert("No registered students to export for this workshop yet!");
+                return;
+            }
+
+            // CSV Header with Event Metadata
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += `Workshop Title,"${(workshop.title || '').replace(/"/g, '""')}"\n`;
+            csvContent += `Date,"${workshop.date || 'TBD'}"\n`;
+            csvContent += `Time,"${workshop.time || 'TBD'}"\n`;
+            csvContent += `Teacher,"${(workshop.teacher || '').replace(/"/g, '""')}"\n\n`;
+
+            // Student Attendance List Columns (Without Fee)
+            csvContent += "No.,Student Name,Family ID\n";
+
+            // Populate Student Rows
+            attendees.forEach((a, index) => {
+                let name = typeof a === 'string' ? a : (a.name || 'Student');
+                let family = typeof a === 'string' ? 'N/A' : (a.family || 'N/A');
+
+                csvContent += `${index + 1},"${name.replace(/"/g, '""')}","${family}"\n`;
+            });
+
+            // Trigger Browser Download
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            const safeTitle = (workshop.title || "Workshop").replace(/[^a-zA-Z0-9]/g, "_");
+    
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `${safeTitle}_Attendance_${workshop.date || 'list'}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
         window.adjustWallet = async function(familyKey) {
             const amountStr = prompt('Enter amount to add (positive) or top-up for family wallet:', '50');
             if (amountStr === null) return;
