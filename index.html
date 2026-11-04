@@ -198,22 +198,21 @@
         };
 
         window.sendWhatsAppPortalLink = function(studentName, familyId, phone) {
-            if (!phone || phone === '-') {
+            if (!phone) {
                 alert("No contact phone number available for this family!");
                 return;
             }
 
-            // Clean phone number format for WhatsApp (e.g., 012-3456789 -> 60123456789)
+            // Clean phone number and ensure country code format (e.g. Malaysia 60)
             let cleanPhone = phone.replace(/[^0-9]/g, '');
             if (cleanPhone.startsWith('0')) {
-                cleanPhone = '6' + cleanPhone;
+                cleanPhone = '6' + cleanPhone; // Automatically formats 012-345-6789 to 60123456789 for WhatsApp
             }
 
-            // Build the direct portal URL using encodeURIComponent for student names with spaces
-            const encodedStudentName = encodeURIComponent(studentName);
-            const portalUrl = `https://theexpressivoclub.github.io/expressivo-club/portal.html?student=${encodedStudentName}`;
+            // Your portal URL (passing the family ID automatically in the link)
+            const portalUrl = `https://theexpressivoclub.github.io/?family=${familyId}`;
 
-            const message = `Hi! Welcome to Expressivo Club! 🎹\n\nYou can check ${studentName}'s star balance, view registered workshops, and check your family wallet anytime using our Parent Portal:\n\n${portalUrl}\n\n*Tip: Open this link in your browser and select "Add to Home Screen" to use it like an app!*`;
+            const message = `Hi! Welcome to Expressivo Club! 🎹\n\nYou can check ${studentName}'s star balance, view registered workshops, and check your family wallet anytime using our Parent Portal:\n\n${portalUrl}\n\nYour Family ID: *${familyId}*\n\n*Tip: Open this link in your browser and select "Add to Home Screen" to use it like an app!*`;
 
             const encodedMessage = encodeURIComponent(message);
             const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
