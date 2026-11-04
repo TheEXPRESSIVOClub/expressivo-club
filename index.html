@@ -1020,6 +1020,10 @@
                                 <button onclick="addReferralStarsWithRemark('${s.family}')" class="px-2.5 py-1 bg-amber-600 text-white font-bold rounded text-[10px] hover:bg-amber-700">+Ref</button>
                                 <button onclick="adjustManualStars('${s.family}')" class="px-2.5 py-1 bg-purple-600 text-white font-bold rounded text-[10px] hover:bg-purple-700">Stars</button>
                                 <button onclick="deleteStudent('${s.id}', '${s.name}', '${s.family}')" class="px-2.5 py-1 bg-rose-600 text-white font-bold rounded text-[10px] hover:bg-rose-700">Del</button>
+                                <button onclick="sendWhatsAppPortalLink('${student.name}', '${student.family}', '${student.phone}')" 
+                                        class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px] shadow-sm transition flex items-center gap-1">
+                                    💬 WhatsApp
+                                </button>
                             </td>
                         </tr>
                     `;
