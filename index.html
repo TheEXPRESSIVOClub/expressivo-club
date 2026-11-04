@@ -1008,7 +1008,7 @@
                         : '';
                     return `
                         <tr class="border-b hover:bg-slate-50">
-                            <td class="p-3 font-bold text-slate-900">${s.name} ${birthdayBadge}</td>
+                            <td class="p-3 font-bold text-slate-900">${s.name}${birthdayBadge}</td>
                             <td class="p-3 text-slate-600">${s.family}</td>
                             <td class="p-3 text-slate-600">${s.contact || '-'}</td>
                             <td class="p-3 text-slate-600">${s.dob || '<span class="text-amber-500 italic font-semibold">Not set</span>'}</td>
@@ -1016,22 +1016,25 @@
                             <td class="p-3 font-bold text-emerald-600">RM ${Number(fam.wallet || 0).toFixed(2)}</td>
                             <td class="p-3 font-bold text-amber-600">${fam.stars || 100} ⭐</td>
                             <td class="p-3 text-right">
-                                <div class="inline-flex flex-col gap-1 items-end">
+                                <div class="flex flex-col gap-1 items-end">
                                     <!-- Top Row: Portal, WhatsApp, Wallet -->
                                     <div class="flex gap-1">
-                                        <button onclick="openParentPortal('${s.name}')" class="px-2.5 py-1 bg-indigo-600 text-white font-bold rounded text-[10px] hover:bg-indigo-700">Portal</button>
-                                        <button onclick="sendWhatsAppPortalLink('${s.name}', '${s.family}', '${s.contact || ''}')" class="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded text-[10px] hover:bg-emerald-700">💬 WhatsApp</button>
-                                        <button onclick="adjustWallet('${s.family}')" class="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded text-[10px] hover:bg-emerald-700">Wallet</button>
+                                        <button type="button" onclick="openParentPortal('${s.name}')" class="px-2 py-1 bg-indigo-600 text-white font-bold rounded text-[10px] hover:bg-indigo-700">Portal</button>
+                                        <button type="button" onclick="sendWhatsAppPortalLink('${s.name}', '${s.family}', '${s.contact || ''}')" class="px-2 py-1 bg-emerald-600 text-white font-bold rounded text-[10px] hover:bg-emerald-700">💬 WhatsApp</button>
+                                        <button type="button" onclick="adjustWallet('${s.family}')" class="px-2 py-1 bg-emerald-600 text-white font-bold rounded text-[10px] hover:bg-emerald-700">Wallet</button>
                                     </div>
                                     <!-- Bottom Row: +Ref, Stars, Del -->
                                     <div class="flex gap-1">
-                                        <button onclick="addReferralStarsWithRemark('${s.family}')" class="px-2.5 py-1 bg-amber-600 text-white font-bold rounded text-[10px] hover:bg-amber-700">+Ref</button>
-                                        <button onclick="adjustManualStars('${s.family}')" class="px-2.5 py-1 bg-purple-600 text-white font-bold rounded text-[10px] hover:bg-purple-700">Stars</button>
-                                        <button onclick="deleteStudent('${s.id}', '${s.name}', '${s.family}')" class="px-2.5 py-1 bg-rose-600 text-white font-bold rounded text-[10px] hover:bg-rose-700">Del</button>
+                                        <button type="button" onclick="addReferralStarsWithRemark('${s.family}')" class="px-2 py-1 bg-amber-600 text-white font-bold rounded text-[10px] hover:bg-amber-700">+Ref</button>
+                                        <button type="button" onclick="adjustManualStars('${s.family}')" class="px-2 py-1 bg-purple-600 text-white font-bold rounded text-[10px] hover:bg-purple-700">Stars</button>
+                                        <button type="button" onclick="deleteStudent('${s.id}', '${s.name}', '${s.family}')" class="px-2 py-1 bg-rose-600 text-white font-bold rounded text-[10px] hover:bg-rose-700">Del</button>
                                     </div>
                                 </div>
                             </td>
                         </tr>
+                        `;
+                        }).join('');
+            }
 
             // Update Workshops List with Quick Inline Editing & Student Cancellation with Remarks
             const workshopsContainer = document.getElementById('admin-workshops-container');
