@@ -209,10 +209,11 @@
                 cleanPhone = '6' + cleanPhone; // Automatically formats 012-345-6789 to 60123456789 for WhatsApp
             }
 
-            // Your portal URL (passing the family ID automatically in the link)
-            const portalUrl = `https://theexpressivoclub.github.io/?family=${familyId}`;
-
-            const message = `Hi! Welcome to Expressivo Club! 🎹\n\nYou can check ${studentName}'s star balance, view registered workshops, and check your family wallet anytime using our Parent Portal:\n\n${portalUrl}\n\nYour Family ID: *${familyId}*\n\n*Tip: Open this link in your browser and select "Add to Home Screen" to use it like an app!*`;
+            // Your portal URL (passing the student name automatically in the link)
+            const encodedStudentName = encodeURIComponent(studentName);
+            const portalUrl = `https://theexpressivoclub.github.io/expressivo-club/portal.html?student=${encodedStudentName}`;
+    
+            const message = `Hi! Welcome to Expressivo Club! 🎹\n\nYou can check ${studentName}'s star balance, view registered workshops, and check your family wallet anytime using our Parent Portal:\n\n${portalUrl}\n\n*Tip: Open this link in your browser and select "Add to Home Screen" to use it like an app!*`;
 
             const encodedMessage = encodeURIComponent(message);
             const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
@@ -1014,21 +1015,18 @@
                             <td class="p-3"><span class="px-2 py-0.5 bg-indigo-100 text-indigo-800 font-bold rounded text-[10px]">${fam.tier || 'Prelude'}</span></td>
                             <td class="p-3 font-bold text-emerald-600">RM ${Number(fam.wallet || 0).toFixed(2)}</td>
                             <td class="p-3 font-bold text-amber-600">${fam.stars || 100} ⭐</td>
-                            <td class="p-3 text-right">
-                                <div class="inline-flex flex-col gap-1">
-                                    <div class="flex gap-1 justify-end">
-                                        <button onclick="openParentPortal('${s.name}')" class="px-2.5 py-1 bg-indigo-600 text-white font-bold rounded text-[10px] hover:bg-indigo-700">Portal</button>
-                                        <button onclick="sendWhatsAppPortalLink('${s.name}', '${s.family}', '${s.contact || ''}')" class="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded text-[10px] hover:bg-emerald-700">💬 WhatsApp</button>
-                                        <button onclick="adjustWallet('${s.family}')" class="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded text-[10px] hover:bg-emerald-700">Wallet</button>
-                                    </div>
-                                    <div class="flex gap-1 justify-end">
-                                        <button onclick="addReferralStarsWithRemark('${s.family}')" class="px-2.5 py-1 bg-amber-600 text-white font-bold rounded text-[10px] hover:bg-amber-700">+Ref</button>
-                                        <button onclick="adjustManualStars('${s.family}')" class="px-2.5 py-1 bg-purple-600 text-white font-bold rounded text-[10px] hover:bg-purple-700">Stars</button>
-                                        <button onclick="deleteStudent('${s.id}', '${s.name}', '${s.family}')" class="px-2.5 py-1 bg-rose-600 text-white font-bold rounded text-[10px] hover:bg-rose-700">Del</button>
-                                    </div>
-                                </div>
+                            <td class="p-3 text-right space-x-1">
+                                <button onclick="openParentPortal('${s.name}')" class="px-2.5 py-1 bg-indigo-600 text-white font-bold rounded text-[10px] hover:bg-indigo-700">Portal</button>
+                                <button onclick="sendWhatsAppPortalLink('${s.name}', '${s.family}', '${s.phone}')" class="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded text-[10px] hover:bg-emerald-700">WhatsApp</button>
+                                <button onclick="adjustWallet('${s.family}')" class="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded text-[10px] hover:bg-emerald-700">Wallet</button>
+                                <button onclick="addReferralStarsWithRemark('${s.family}')" class="px-2.5 py-1 bg-amber-600 text-white font-bold rounded text-[10px] hover:bg-amber-700">+Ref</button>
+                                <button onclick="adjustManualStars('${s.family}')" class="px-2.5 py-1 bg-purple-600 text-white font-bold rounded text-[10px] hover:bg-purple-700">Stars</button>
+                                <button onclick="deleteStudent('${s.id}', '${s.name}', '${s.family}')" class="px-2.5 py-1 bg-rose-600 text-white font-bold rounded text-[10px] hover:bg-rose-700">Del</button>
                             </td>
                         </tr>
+                    `;
+                }).join('');
+            }
 
             // Update Workshops List with Quick Inline Editing & Student Cancellation with Remarks
             const workshopsContainer = document.getElementById('admin-workshops-container');
