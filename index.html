@@ -531,7 +531,7 @@
                     amount: `${amount >= 0 ? '+' : ''} RM ${amount.toFixed(2)}`,
                     starsChange: '0 ⭐'
                 });
-                showOfficialTopUpReceipt(selectedStudent.name, selectedStudent.familyId || 'EX-000', topUpAmount, newBalance, selectedStudent.parentPhone || '');
+                alert('Wallet updated!');
             } catch (err) {
                 console.error("Error updating wallet:", err);
             }
