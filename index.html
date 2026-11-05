@@ -1283,6 +1283,64 @@
         </div>
     </div>
 
+    <div id="official-receipt-modal" class="hidden fixed inset-0 bg-black/65 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-white w-full max-w-2xl p-8 rounded-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto text-slate-800">
+            <div class="flex justify-between items-center border-b pb-4 mb-6 print:hidden">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Official Top-Up Receipt Preview</span>
+                <div class="flex gap-2">
+                    <button onclick="sendOfficialWhatsAppReceipt()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg">💬 WhatsApp Parent</button>
+                    <button onclick="window.print()" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg">🖨️ Print / PDF</button>
+                    <button onclick="closeOfficialReceipt()" class="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-lg">Close</button>
+                </div>
+            </div>
+            <div id="printable-receipt" class="space-y-6 text-xs">
+                <div class="flex justify-between items-start border-b pb-6">
+                    <div>
+                        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Receipt</h1>
+                        <p class="text-slate-500 font-medium">Ref. No.: <span id="off-ref" class="font-bold text-slate-800">-</span></p>
+                        <p class="text-slate-500 font-medium">Receipt Date: <span id="off-date">-</span></p>
+                    </div>
+                    <div class="text-right">
+                        <h2 class="font-bold text-slate-900 text-xs">Expressivo Sdn. Bhd.</h2>
+                        <p class="text-[11px] text-slate-500">BRN: 202501036938 (1638348-V)</p>
+                        <p class="text-[11px] text-slate-500">Bayan Lepas, Penang</p>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <p><span class="font-bold text-slate-800">Student:</span> <span id="off-student-name">-</span></p>
+                    <p><span class="font-bold text-slate-800">Family Ref:</span> <span id="off-family-id">-</span></p>
+                </div>
+                <div>
+                    <div class="bg-slate-100 font-bold px-3 py-1.5 text-slate-800 border-b">Payment Method</div>
+                    <div class="flex justify-between px-3 py-2 text-slate-700 border-b">
+                        <span id="off-pay-method">Bank Transfer</span>
+                        <span id="off-pay-amount" class="font-bold">RM 0.00</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="bg-slate-100 font-bold px-3 py-1.5 text-slate-800 border-b flex justify-between">
+                        <span>Description</span>
+                        <span>Amount (RM)</span>
+                    </div>
+                    <div class="flex justify-between px-3 py-3 text-slate-700 border-b">
+                        <span>Wallet Credit Top-Up</span>
+                        <span id="off-item-amount" class="font-bold">0.00</span>
+                    </div>
+                </div>
+                <div class="flex flex-col items-end space-y-1 pt-2">
+                    <div class="w-48 flex justify-between font-bold text-slate-900 text-xs">
+                        <span>Total</span>
+                        <span id="off-total">0.00</span>
+                    </div>
+                    <div class="w-48 flex justify-between font-bold text-indigo-600 text-xs border-t pt-1">
+                        <span>New Wallet Balance</span>
+                        <span id="off-new-balance">RM 0.00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="max-w-6xl mx-auto space-y-6">
         <!-- TOP HEADER -->
         <header class="bg-slate-900 text-white p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
