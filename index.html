@@ -1823,7 +1823,49 @@
             alert("Error: " + err.message);
         }
     };
-</script>
+
+    // --- PASTE THESE FUNCTIONS HERE ---
+        let currentTopUpData = null;
+
+        window.showOfficialTopUpReceipt = function(studentName, familyId, topUpAmount, newWalletBalance, contactPhone) {
+            const today = new Date();
+            const dateFormatted = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            const refNo = 'ESV' + Math.floor(100000 + Math.random() * 900000);
+
+            currentTopUpData = { studentName, familyId, topUpAmount, newWalletBalance, contactPhone, refNo, dateFormatted };
+
+            document.getElementById('off-ref').innerText = refNo;
+            document.getElementById('off-date').innerText = dateFormatted;
+            document.getElementById('off-student-name').innerText = studentName;
+            document.getElementById('off-family-id').innerText = familyId;
+            document.getElementById('off-pay-method').innerText = `${dateFormatted}: Bank Transfer / Cash`;
+            document.getElementById('off-pay-amount').innerText = `RM ${Number(topUpAmount).toFixed(2)}`;
+            document.getElementById('off-item-amount').innerText = Number(topUpAmount).toFixed(2);
+            document.getElementById('off-total').innerText = Number(topUpAmount).toFixed(2);
+            document.getElementById('off-new-balance').innerText = `RM ${Number(newWalletBalance).toFixed(2)}`;
+
+            document.getElementById('official-receipt-modal').classList.remove('hidden');
+        };
+
+        window.closeOfficialReceipt = function() {
+            document.getElementById('official-receipt-modal').classList.add('hidden');
+        };
+
+        window.sendOfficialWhatsAppReceipt = function() {
+            if (!currentTopUpData || !currentTopUpData.contactPhone) {
+                alert("No phone number available for this family.");
+                return;
+            }
+            let phone = currentTopUpData.contactPhone.replace(/[^0-9]/g, '');
+            if (phone.startsWith('0')) phone = '6' + phone;
+
+            const portalUrl = `https://theexpressivoclub.github.io/portal.html?student=${encodeURIComponent(currentTopUpData.studentName)}`;
+            const msg = `Hi ${currentTopUpData.studentName}'s parent! 👋\n\nThank you for your payment to *Expressivo Music & Art Studio*.\n\n📄 *Official Receipt Ref:* ${currentTopUpData.refNo}\n💰 *Top-Up Amount:* RM ${Number(currentTopUpData.topUpAmount).toFixed(2)}\n💳 *Updated Wallet Balance:* RM ${Number(currentTopUpData.newWalletBalance).toFixed(2)}\n\nView receipt via Parent Portal:\n🔗 ${portalUrl}`;
+
+            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+        };
+       
+</script>    
 </body>
 </html>
 </body>
