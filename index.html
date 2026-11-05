@@ -1769,6 +1769,57 @@
         }
     };
 
+    let currentTopUpReceiptData = null;
+
+    window.showOfficialTopUpReceipt = function(studentName, familyId, topUpAmount, newWalletBalance, contactPhone) {
+        const dateFormatted = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        const refNo = 'ESV' + Math.floor(100000 + Math.random() * 900000);
+
+        currentTopUpReceiptData = {
+            studentName: studentName || 'Student',
+            familyId: familyId || 'EX-100',
+            topUpAmount: topUpAmount || 0,
+            newWalletBalance: newWalletBalance || 0,
+            contactPhone: contactPhone || '',
+            refNo: refNo,
+            dateFormatted: dateFormatted
+        };
+
+        document.getElementById('off-ref').innerText = refNo;
+        document.getElementById('off-date').innerText = dateFormatted;
+        document.getElementById('off-student-name').innerText = studentName;
+        document.getElementById('off-family-id').innerText = familyId;
+        document.getElementById('off-pay-method').innerText = dateFormatted + ': Bank Transfer / Cash';
+        document.getElementById('off-pay-amount').innerText = 'RM ' + Number(topUpAmount).toFixed(2);
+        document.getElementById('off-item-amount').innerText = Number(topUpAmount).toFixed(2);
+        document.getElementById('off-total').innerText = Number(topUpAmount).toFixed(2);
+        document.getElementById('off-new-balance').innerText = 'RM ' + Number(newWalletBalance).toFixed(2);
+
+        document.getElementById('official-receipt-modal').classList.remove('hidden');
+    };
+
+    window.closeOfficialReceipt = function() {
+        document.getElementById('official-receipt-modal').classList.add('hidden');
+    };
+
+    window.sendOfficialWhatsAppReceipt = function() {
+        const data = currentTopUpReceiptData;
+        if (!data) return alert("No receipt data found.");
+            
+        let phone = (data.contactPhone || '').replace(/[^0-9]/g, '');
+        if (!phone) {
+            phone = prompt("Please enter parent WhatsApp phone number (e.g. 0123456789):");
+            if (!phone) return;
+            phone = phone.replace(/[^0-9]/g, '');
+        }
+        if (phone.startsWith('0')) phone = '6' + phone;
+
+        const portalUrl = `https://theexpressivoclub.github.io/portal.html?student=${encodeURIComponent(data.studentName)}`;
+        const msg = `Hi ${data.studentName}'s parent! 👋\n\nThank you for your payment to *Expressivo Music & Art Studio*.\n\n📄 *Official Receipt Ref:* ${data.refNo}\n💰 *Top-Up Amount:* RM ${Number(data.topUpAmount).toFixed(2)}\n💳 *Updated Wallet Balance:* RM ${Number(data.newWalletBalance).toFixed(2)}\n\nYou can view and download your official receipt anytime via your Parent Portal:\n🔗 ${portalUrl}\n\nThank you! ✨`;
+
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+    };    
+
     window.markVoucherUsed = async function(docId) {
         if (!confirm("Are you sure you want to mark this voucher as USED?")) return;
         try {
