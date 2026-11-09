@@ -532,6 +532,12 @@
                     starsChange: '0 ⭐'
                 });
                 alert('Wallet updated!');
+
+                // 🎯 TRIGGER THE OFFICIAL RECEIPT POPUP HERE:
+                // Find a student belonging to this family to show their name/phone on the receipt
+                const sampleStudent = (window.appData.students || []).find(s => s.family === familyKey) || { name: familyKey, phone: '' };
+                showOfficialTopUpReceipt(sampleStudent.name, familyKey, amount, newTotal, sampleStudent.parentPhone || sampleStudent.phone || '');
+            
             } catch (err) {
                 console.error("Error updating wallet:", err);
             }
