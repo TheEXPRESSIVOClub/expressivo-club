@@ -884,17 +884,36 @@
         
         // 2. RECEIPT JAVASCRIPT FUNCTIONS PLACED INSIDE SCRIPT
         window.viewParentReceipt = function(refNo, amount, date, studentName, familyId, description) {
+            const modal = document.getElementById('parentReceiptModal');
+            if (!modal) {
+                alert("Error: parentReceiptModal HTML is missing!");
+                return;
+            }
+
+            // 🎯 SMART FALLBACK: If studentName is missing or says "Family Admin", 
+            // grab the active student's name from window.portalData automatically!
+            let actualStudentName = studentName;
+            if (!actualStudentName || actualStudentName === 'Family Admin' || actualStudentName === 'undefined') {
+                if (window.portalData && window.portalData.student && window.portalData.student.name) {
+                    actualStudentName = window.portalData.student.name;
+                } else {
+                    actualStudentName = "Eugene Teoh"; // Final fallback
+                }
+            }
+
+            // Clean amount (remove "+", "RM", spaces)
+            const rawAmount = (amount || '0').toString().replace(/[^0-9.]/g, '');
+    
             document.getElementById('pReceiptRef').innerText = refNo || 'ESV-' + Math.floor(100000 + Math.random() * 900000);
             document.getElementById('pReceiptDate').innerText = date || new Date().toLocaleDateString('en-GB');
-            document.getElementById('pReceiptStudent').innerText = studentName || 'Student';
-            document.getElementById('pReceiptFamily').innerText = familyId || '-';
+            document.getElementById('pReceiptStudent').innerText = actualStudentName;
+            document.getElementById('pReceiptFamily').innerText = familyId || (window.portalData && window.portalData.student ? window.portalData.student.family : 'EX-110');
             document.getElementById('pReceiptDesc').innerText = description || 'Wallet Credit Top-Up';
-            
-            const formattedAmount = 'RM ' + Number(amount || 0).toFixed(2);
-            document.getElementById('pReceiptAmount').innerText = Number(amount || 0).toFixed(2);
-            document.getElementById('pReceiptTotal').innerText = formattedAmount;
+    
+            document.getElementById('pReceiptAmount').innerText = Number(rawAmount).toFixed(2);
+            document.getElementById('pReceiptTotal').innerText = 'RM ' + Number(rawAmount).toFixed(2);
 
-            document.getElementById('parentReceiptModal').style.display = 'flex';
+            modal.style.display = 'flex';
         };
 
         window.closeParentReceipt = function() {
