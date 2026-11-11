@@ -1848,17 +1848,20 @@
 
     window.sendOfficialWhatsAppReceipt = function() {
         const data = currentTopUpReceiptData;
-        console.log("🔍 Inspecting receipt data:", data);
-        
         if (!data) return alert("No receipt data found.");
-            
+    
+        // Clean up the phone number directly from your data
         let phone = (data.contactPhone || '').replace(/[^0-9]/g, '');
+    
         if (!phone) {
-            phone = prompt("Please enter parent WhatsApp phone number (e.g. 0123456789):");
-            if (!phone) return;
-            phone = phone.replace(/[^0-9]/g, '');
+            alert("Error: No phone number found for this student record.");
+            return;
         }
-        if (phone.startsWith('0')) phone = '6' + phone;
+    
+        // Add Malaysia country code if it starts with 0
+        if (phone.startsWith('0')) {
+            phone = '6' + phone;
+        }
 
         const portalUrl = `https://theexpressivoclub.github.io/portal.html?student=${encodeURIComponent(data.studentName)}`;
         const msg = `Hi ${data.studentName}'s parent! 👋\n\nThank you for your payment to *Expressivo Music & Art Studio*.\n\n📄 *Official Receipt Ref:* ${data.refNo}\n💰 *Top-Up Amount:* RM ${Number(data.topUpAmount).toFixed(2)}\n💳 *Updated Wallet Balance:* RM ${Number(data.newWalletBalance).toFixed(2)}\n\nYou can view and download your official receipt anytime via your Parent Portal:\n🔗 ${portalUrl}\n\nThank you! ✨`;
