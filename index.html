@@ -1849,24 +1849,27 @@
     window.sendOfficialWhatsAppReceipt = function() {
         const data = currentTopUpReceiptData;
         if (!data) return alert("No receipt data found.");
-    
-        // Clean up the phone number directly from your data
-        let phone = (data.contactPhone || '').replace(/[^0-9]/g, '');
-    
+
+        // Use the contactPhone from data, just like your portal function uses 'phone'
+        let phone = data.contactPhone;
         if (!phone) {
-            alert("Error: No phone number found for this student record.");
+            alert("No contact phone number available for this family!");
             return;
         }
-    
-        // Add Malaysia country code if it starts with 0
-        if (phone.startsWith('0')) {
-            phone = '6' + phone;
+
+        // Clean phone number and ensure country code format
+        let cleanPhone = phone.replace(/[^0-9]/g, '');
+        if (cleanPhone.startsWith('0')) {
+            cleanPhone = '6' + cleanPhone; // Automatically formats 016-4315052 to 60164315052
         }
 
-        const portalUrl = `https://theexpressivoclub.github.io/portal.html?student=${encodeURIComponent(data.studentName)}`;
-        const msg = `Hi ${data.studentName}'s parent! 👋\n\nThank you for your payment to *Expressivo Music & Art Studio*.\n\n📄 *Official Receipt Ref:* ${data.refNo}\n💰 *Top-Up Amount:* RM ${Number(data.topUpAmount).toFixed(2)}\n💳 *Updated Wallet Balance:* RM ${Number(data.newWalletBalance).toFixed(2)}\n\nYou can view and download your official receipt anytime via your Parent Portal:\n🔗 ${portalUrl}\n\nThank you! ✨`;
+        const portalUrl = `https://theexpressivoclub.github.io/expressivo-club/portal.html?student=${encodeURIComponent(data.studentName)}`;
+    
+        const message = `Hi ${data.studentName}'s parent! 👋\n\nThank you for your payment to *The Expressivo Club*.\n\n📄 *Official Receipt Ref:* ${data.refNo}\n💰 *Top-Up Amount:* RM ${Number(data.topUpAmount).toFixed(2)}\n💳 *Updated Wallet Balance:* RM ${Number(data.newWalletBalance).toFixed(2)}\n\nYou can view and download your official receipt anytime via your Parent Portal:\n🔗 ${portalUrl}\n\nThank you! ✨`;
 
-        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+        const encodedMessage = encodeURIComponent(message);
+        const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+        window.open(whatsappUrl, '_blank');
     };    
 
     window.markVoucherUsed = async function(docId) {
