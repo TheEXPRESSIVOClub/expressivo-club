@@ -533,15 +533,25 @@
                 });
                 alert('Wallet updated!');
 
-                // 🎯 TRIGGER THE OFFICIAL RECEIPT POPUP HERE:
-                // Find a student belonging to this family to show their name/phone on the receipt
-                const sampleStudent = (window.appData.students || []).find(s => s.family === familyKey) || { name: familyKey, phone: '' };
-                showOfficialTopUpReceipt(sampleStudent.name, familyKey, amount, newTotal, sampleStudent.parentPhone || sampleStudent.phone || '');
-            
+                // 🎯 DIRECT RECEIPT TRIGGER:
+                // This grabs the student name from the active POS selection or defaults to the Family ID
+                let studentName = familyKey;
+                let parentPhone = '';
+                try {
+                    const activeStudent = window.appData.students.find(x => x.id === window.appData.activePosStudentId || x.family === familyKey);
+                    if (activeStudent) {
+                        studentName = activeStudent.name || familyKey;
+                        parentPhone = activeStudent.parentPhone || activeStudent.phone || '';
+                    }
+                } catch(e) { console.log(e); }
+
+                showOfficialTopUpReceipt(studentName, familyKey, amount, newTotal, parentPhone);
+
             } catch (err) {
                 console.error("Error updating wallet:", err);
+                alert("Error: " + err.message);
             }
-        }
+        };
 
         // Initialize default POS Mode
         window.appData.posMode = window.appData.posMode || 'workshop';
