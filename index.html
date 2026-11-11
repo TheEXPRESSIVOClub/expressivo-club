@@ -565,7 +565,7 @@
                     const activeStudent = window.appData.students.find(x => x.id === window.appData.activePosStudentId || x.family === familyKey);
                     if (activeStudent) {
                         studentName = activeStudent.name || familyKey;
-                        parentPhone = activeStudent.parentPhone || activeStudent.phone || '';
+                        parentPhone = activeStudent.parentPhone || activeStudent.phone || activeStudent.contact || '';
                     }
                 } catch(e) { console.log(e); }
 
