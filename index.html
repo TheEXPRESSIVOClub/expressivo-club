@@ -1848,6 +1848,8 @@
 
     window.sendOfficialWhatsAppReceipt = function() {
         const data = currentTopUpReceiptData;
+        console.log("🔍 Inspecting receipt data:", data);
+        
         if (!data) return alert("No receipt data found.");
             
         let phone = (data.contactPhone || '').replace(/[^0-9]/g, '');
