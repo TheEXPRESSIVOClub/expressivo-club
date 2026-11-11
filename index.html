@@ -569,7 +569,7 @@
                     }
                 } catch(e) { console.log(e); }
 
-                showOfficialTopUpReceipt(studentName, familyKey, amount, newTotal, activeStudent.parentPhone);
+                showOfficialTopUpReceipt(studentName, familyKey, amount, newTotal, selectedStudent.contact);
 
             } catch (err) {
                 console.error("Error updating wallet:", err);
