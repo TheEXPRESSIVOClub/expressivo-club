@@ -5,6 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Expressivo Club - Admin Dashboard (Live)</title>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #official-receipt-modal, #official-receipt-modal * {
+                visibility: visible;
+            }
+            #official-receipt-modal {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background: white !important;
+            }
+            .print\:hidden {
+                display: none !important;
+            }
+        }
+    </style>
+    
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
