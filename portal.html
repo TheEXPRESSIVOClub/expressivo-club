@@ -789,8 +789,75 @@
             <div id="my-rewards-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
         </div>
     </div>
+    <!-- 1. PARENT PORTAL RECEIPT MODAL PLACED HERE -->
+    <div id="parentReceiptModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center; padding: 15px; overflow-y: auto;">
+      <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); font-family: system-ui, -apple-system, sans-serif; position: relative; color: #333;">
+        
+        <!-- Action Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 12px; margin-bottom: 16px;">
+          <span style="font-size: 11px; font-weight: 700; color: #666; letter-spacing: 0.5px; text-transform: uppercase;">Official Receipt</span>
+          <div>
+            <button onclick="printParentReceipt()" style="background: #4f46e5; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; margin-right: 6px;">🖨️ Print / Save PDF</button>
+            <button onclick="closeParentReceipt()" style="background: #e5e7eb; color: #374151; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">Close</button>
+          </div>
+        </div>
+
+        <!-- Printable Receipt Content -->
+        <div id="parentReceiptContent">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+            <img src="https://i.ibb.co/tw5wHtb8/logo.png" alt="Expressivo Logo" style="height: 48px; object-fit: contain;">
+            <div style="text-align: right; font-size: 11px; color: #555; line-height: 1.4;">
+              <strong style="color: #111; font-size: 12px;">Expressivo Sdn. Bhd.</strong><br>
+              BRN: 202501036938 (1638348-V)<br>
+              No.3, R2-02-23A, Persiaran Kelicap,<br>Setia Triangle, 11900 Bayan Lepas, Penang
+            </div>
+          </div>
+
+          <div style="border-top: 2px solid #111; border-bottom: 2px solid #111; padding: 12px 0; margin-bottom: 20px; display: flex; justify-content: space-between;">
+            <div>
+              <h2 style="margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px;">Receipt</h2>
+              <div style="font-size: 12px; color: #666; margin-top: 4px;">Ref. No.: <strong id="pReceiptRef" style="color: #111;">-</strong></div>
+            </div>
+            <div style="text-align: right; font-size: 12px; color: #666;">
+              <div>Date: <strong id="pReceiptDate" style="color: #111;">-</strong></div>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 20px; font-size: 13px;">
+            <div style="margin-bottom: 4px;"><strong>Student:</strong> <span id="pReceiptStudent">-</span></div>
+            <div><strong>Family Ref:</strong> <span id="pReceiptFamily">-</span></div>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px;">
+            <thead>
+              <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; text-align: left;">
+                <th style="padding: 8px;">Description</th>
+                <th style="padding: 8px; text-align: right;">Amount (RM)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 10px 8px;" id="pReceiptDesc">Wallet Credit Top-Up</td>
+                <td style="padding: 10px 8px; text-align: right; font-weight: 600;" id="pReceiptAmount">0.00</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="border-top: 1px dashed #cbd5e1; padding-top: 12px; text-align: right; font-size: 14px;">
+            <div><strong>Total Paid:</strong> <span id="pReceiptTotal" style="font-weight: 700; font-size: 16px;">RM 0.00</span></div>
+          </div>
+
+          <div style="margin-top: 25px; text-align: center; font-size: 11px; color: #888; border-top: 1px solid #f1f5f9; padding-top: 12px;">
+            Thank you for learning & growing with Expressivo! ✨<br>
+            <i>This is a computer-generated receipt. No signature required.</i>
+          </div>
+        </div>
+
+      </div>
+    </div>
         
     <script>
+        
         function switchTab(tab) {
             ['dashboard', 'rewards', 'workshops', 'my-bookings', 'my-rewards'].forEach(t => {
                 document.getElementById(`content-${t}`).classList.add('hidden');
