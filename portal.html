@@ -880,6 +880,53 @@
             document.getElementById(`content-${tab}`).classList.remove('hidden');
             document.getElementById(`tab-${tab}`).className = "px-4 py-2 bg-slate-900 text-white rounded-lg whitespace-nowrap";
         }
+
+        
+        // 2. RECEIPT JAVASCRIPT FUNCTIONS PLACED INSIDE SCRIPT
+        window.viewParentReceipt = function(refNo, amount, date, studentName, familyId, description) {
+            document.getElementById('pReceiptRef').innerText = refNo || 'ESV-' + Math.floor(100000 + Math.random() * 900000);
+            document.getElementById('pReceiptDate').innerText = date || new Date().toLocaleDateString('en-GB');
+            document.getElementById('pReceiptStudent').innerText = studentName || 'Student';
+            document.getElementById('pReceiptFamily').innerText = familyId || '-';
+            document.getElementById('pReceiptDesc').innerText = description || 'Wallet Credit Top-Up';
+            
+            const formattedAmount = 'RM ' + Number(amount || 0).toFixed(2);
+            document.getElementById('pReceiptAmount').innerText = Number(amount || 0).toFixed(2);
+            document.getElementById('pReceiptTotal').innerText = formattedAmount;
+
+            document.getElementById('parentReceiptModal').style.display = 'flex';
+        };
+
+        window.closeParentReceipt = function() {
+            document.getElementById('parentReceiptModal').style.display = 'none';
+        };
+
+        window.printParentReceipt = function() {
+            const content = document.getElementById('parentReceiptContent').innerHTML;
+            const printWindow = window.open('', '_blank', 'width=650,height=800');
+            
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Receipt - Expressivo</title>
+                        <style>
+                            body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: #111; }
+                            @media print { body { padding: 0; } }
+                        </style>
+                    </head>
+                    <body>
+                        ${content}
+                    </body>
+                </html>
+            `);
+            
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 250);
+        };
     </script>
 </body>
 </html>
