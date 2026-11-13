@@ -155,9 +155,13 @@
             // Explicitly grab the date value, with a clear fallback if empty
             const dobInput = document.getElementById('new-student-dob');
             const dob = (dobInput && dobInput.value) ? dobInput.value : '2016-01-01';
-    
+
             const tier = document.getElementById('new-family-tier').value;
             const wallet = parseFloat(document.getElementById('new-family-wallet').value) || 0;
+    
+            // 🎯 Grab the selected branch
+            const branchSelect = document.getElementById('new-student-branch');
+            const branch = branchSelect ? branchSelect.value : 'Setia Triangle';
 
             try {
                 window.appData = window.appData || {};
@@ -168,7 +172,6 @@
                 const existingFamily = window.appData.families[familyId];
 
                 if (existingFamily) {
-                    // Count how many students currently share this Family ID
                     const linkedStudents = Object.values(window.appData.students).filter(s => s.family === familyId);
                     const currentTier = existingFamily.tier || tier;
                     const maxLimit = currentTier === 'Virtuoso' ? 4 : currentTier === 'Crescendo' ? 2 : 1;
@@ -178,40 +181,43 @@
                         return;
                     }
 
-                    // Link student to existing family (preserve existing wallet & stars)
-                    await addDoc(collection(db, "students"), { name, family: familyId, contact, dob });
+                    // Link student to existing family (with branch saved)
+                    await addDoc(collection(db, "students"), { name, family: familyId, contact, dob, branch });
 
                     await addDoc(collection(db, "transactions"), {
                         date: new Date().toISOString().split('T')[0],
                         student: name,
                         family: familyId,
+                        branch: branch,
                         desc: `Linked additional student (${name}) to existing shared family account`,
                         amount: `RM 0.00`,
                         starsChange: '0 ⭐'
                     });
 
-                    alert(`Student "${name}" linked successfully to existing Family Account (${familyId})!`);
+                    alert(`Student "${name}" linked successfully to existing Family Account (${familyId}) at ${branch}!`);
                 } else {
-                    // 2. Create brand new Family Account
+                    // 2. Create brand new Family Account (with branch saved)
                     const famRef = doc(db, "families", familyId);
                     await setDoc(famRef, {
                         wallet: wallet,
                         stars: 100,
-                        tier: tier
+                        tier: tier,
+                        branch: branch
                     }, { merge: true });
 
-                    await addDoc(collection(db, "students"), { name, family: familyId, contact, dob });
+                    await addDoc(collection(db, "students"), { name, family: familyId, contact, dob, branch });
 
                     await addDoc(collection(db, "transactions"), {
                         date: new Date().toISOString().split('T')[0],
                         student: name,
                         family: familyId,
+                        branch: branch,
                         desc: 'Admin registered student & added initial wallet credit',
                         amount: `+ RM ${wallet.toFixed(2)}`,
                         starsChange: '+100 ⭐ (Welcome Bonus)'
                     });
 
-                    alert(`Student "${name}" and new Family Account registered successfully!`);
+                    alert(`Student "${name}" and new Family Account registered successfully at ${branch}!`);
                 }
 
                 e.target.reset();
@@ -1574,6 +1580,15 @@
                     <div>
                         <label class="block font-bold text-slate-600 mb-1">Initial Wallet (RM)</label>
                         <input type="number" id="new-family-wallet" value="100" class="w-full p-2.5 border rounded-lg bg-white">
+                    </div>
+                </div>
+                        <label class="block font-bold text-slate-600 mb-1">Branch</label>
+                        <select id="new-student-branch" class="w-full p-2.5 border rounded-lg bg-white">
+                            <option value="Setia Triangle">Setia Triangle</option>
+                            <option value="Bukit Minyak">Bukit Minyak</option>
+                            <option value="D'Monte">D'Monte</option>
+                            <option value="Batu Kawan">Batu Kawan</option>
+                        </select>
                     </div>
                 </div>
                 <div class="flex justify-end">
